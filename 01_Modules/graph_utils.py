@@ -40,3 +40,13 @@ def unstack(ps,m):
         k=k+1
         i=i+m
     return p
+
+def stack(p):
+    n,m=np.shape(p)
+    ps=np.zeros(n*m)
+    j=0
+    for i in range(n):
+        for k in range(m):
+            ps[j]=p[i,k]
+            j+=1
+    return ps

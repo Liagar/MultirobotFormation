@@ -31,3 +31,4 @@ def bicycle(v,w,theta,gamma,B):
     sdot=[xdot,ydot,thetadot,gammadot]
     return sdot
 
+    
