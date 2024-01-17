@@ -59,7 +59,6 @@ def dibuja_grafo_2D(V,Z):
     for i in range(n):
         g[0,:]=V[Z[i,0]-1,:]
         g[1,:]=V[Z[i,1]-1,:]
-        #print(g)
-        plt.plot(g[:,0],g[:,1],'g--')
-    
+        plt.plot(g[:,0],g[:,1],'k--')
+        
     
