@@ -20,11 +20,13 @@ def matriz_laplaciana(Z,pesos,num_nodos,num_arcos):
     for k in range(num_arcos):
         head=Z[k,0]-1
         tail=Z[k,1]-1
-        for i in range(num_nodos):
-            if head==i:
-                L[i,i]=L[i,i]+pesos[i,tail]
-            elif tail==i:
-                L[head,i]=-pesos[head,i]
+        L[head,tail]=-pesos[head,tail]
+        L[tail,head]=-pesos[tail,head]
+    for i in range(num_nodos):
+        for k in range(num_nodos):
+            if k==i:
+                continue
+            L[i,i]=L[i,i]-L[i,k]
     return L
 
 def unstack(ps,m):
