@@ -39,32 +39,42 @@ def quadprog_solve_qp(P, q, G, h, A=None, b=None):
     print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")
     return solution
 
-r1i=np.array([-10,10,-np.pi*0.25])
-r2i=np.array([10,-10,np.pi*0.75])
+r1i=np.array([-15,10.5,-np.pi*0.20])
+r2i=np.array([4,-10.6,np.pi*0.70])
 R=0.5
 fig, axs = plt.subplots(1)
 pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'red')
 pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'cyan')
 
 '''Control sin CBF'''
+#TODO: Revisar este control porque falla
 kw=0.9
 kv=0.015
-r1_star=np.array([10,-10])
-r2_star=np.array([-10,10])
+r1_star=np.array([9,-5])
+r2_star=np.array([-15,12])
 t=0
 dt=0.1
-tf=8
+tf=15
 n=int(tf/dt)
 r1=np.zeros([n,3])
 r2=np.zeros([n,3])
 r1[0,:]=r1i
 r2[0,:]=r2i
+fi_1=np.zeros([n])
+fi_2=np.zeros([n])
+vr=np.zeros([n,2])
+wr=np.zeros([n,2])
 i=0
 while i<n-1:
     '''Robot 1'''
     fi=np.arctan2(r1_star[1]-r1[i,1],r1_star[0]-r1[i,0])
-    v=kv*np.linalg.norm(r1[i,0:1]-r1_star)**2
+    v=kv*np.linalg.norm(r1[i,0:1].T-r1_star.T)**2
+    if np.abs(fi)>0.8:
+        v=0
     w=kw*(fi-r1[i,2])
+    fi_1[i]=fi
+    vr[i,0]=v
+    wr[i,0]=w
     sdot=mbm.unicycle(v,w,r1[i,2])
     r1[i+1,0]=r1[i,0]+dt*sdot[0]
     r1[i+1,1]=r1[i,1]+dt*sdot[1]
@@ -72,7 +82,13 @@ while i<n-1:
     '''Robot 2'''
     fi=np.arctan2(r2_star[1]-r2[i,1],r2_star[0]-r2[i,0])
     v=kv*np.linalg.norm(r2[i,0:1]-r2_star)**2
+    if np.abs(fi)>0.8:
+        v=0
     w=kw*(fi-r2[i,2])
+    fi_2[i]=fi
+    vr[i,1]=v
+    wr[i,1]=w
+
     sdot=mbm.unicycle(v,w,r2[i,2])
     r2[i+1,0]=r2[i,0]+dt*sdot[0]
     r2[i+1,1]=r2[i,1]+dt*sdot[1]
@@ -83,6 +99,22 @@ while i<n-1:
     pinta_robot_c(r2[i,0], r2[i,1], r2[i,2], R, axs,'c')
     t=t+dt
 plt.title("Without CBF")
+fig=plt.subplot(2,2,1)
+t=np.linspace(0, tf,n)
+plt.plot(t,fi_1,'g-',label='fi_1')
+plt.plot(t,wr[:,0],'b-',label='w1')
+plt.legend()
+plt.subplot(2,2,2)
+plt.plot(t,vr[:,0],'g-',label='v1')
+plt.legend()
+plt.subplot(2,2,3)
+plt.plot(t,fi_2,'g-',label='fi_2')
+plt.plot(t,wr[:,1],'b-',label='w2')
+plt.legend()
+plt.subplot(2,2,4)
+plt.plot(t,vr[:,1],'g-',label='v2')
+plt.legend()
+
 #Animacion
 FFMpegWriter = manimation.writers['ffmpeg']
 metadata = dict(title='Movie Test', artist='Matplotlib',
@@ -93,6 +125,8 @@ fig = plt.figure()
 
 plt.plot(r1[:,0], r1[:,1],'r')
 plt.plot(r2[:,0], r2[:,1],'b')
+plt.plot(r1_star[0],r1_star[1],'rx')
+plt.plot(r2_star[0],r2_star[1],'bx')
 red_robot, = plt.plot([], [], 'ro', markersize = 10)
 cyan_robot,= plt.plot([], [], 'bo', markersize = 10)
 plt.xlabel('x')
@@ -201,7 +235,7 @@ plt.legend()
 i=0
 t=0
 Ds=2
-gamma=0.01
+gamma=0.4
 M = np.array([[1., 0., 0., 0.], [0., 1., 0., 0.], [0., 0., 1., 0.], [0., 0., 0., 1.]])
 P = np.dot(M.T, M)
 #TODO: Revisar, algo no esta bien en la expresion del problema cuadratico
@@ -215,8 +249,12 @@ while i<n-1:
     #Velocidades objetivos
     fi=np.arctan2(r1_star[1]-r1[i,1],r1_star[0]-r1[i,0])
     v1=kv*np.linalg.norm(r1[i,0:1]-r1_star)**2
+    if np.abs(fi)>0.8:
+        v1=0
     w1=kw*(fi-r1[i,2])
     fi=np.arctan2(r2_star[1]-r2[i,1],r2_star[0]-r2[i,0])
+    if np.abs(fi)>0.8:
+        v2=0
     v2=kv*np.linalg.norm(r2[i,0:1]-r2_star)**2
     w2=kw*(fi-r2[i,2])
     #CBF
@@ -270,6 +308,9 @@ fig = plt.figure()
 
 plt.plot(r1[:,0], r1[:,1],'r')
 plt.plot(r2[:,0], r2[:,1],'b')
+plt.plot(r1_star[0],r1_star[1],'rx')
+plt.plot(r2_star[0],r2_star[1],'bx')
+
 red_robot, = plt.plot([], [], 'ro', markersize = 10)
 cyan_robot,= plt.plot([], [], 'bo', markersize = 10)
 plt.xlabel('x')
