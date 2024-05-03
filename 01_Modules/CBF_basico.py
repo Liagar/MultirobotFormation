@@ -39,19 +39,19 @@ def quadprog_solve_qp(P, q, G, h, A=None, b=None):
     print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")
     return solution
 
-r1i=np.array([-15,10.5,-np.pi*0.20])
-r2i=np.array([4,-10.6,np.pi*0.70])
+r1i=np.array([-10 + 5 * np.random.randn() ,10 + 5 * np.random.randn(),np.pi/2 + np.pi/4 * np.random.randn()])
+r2i=np.array([10 + 5 * np.random.randn() ,-10 + 5 * np.random.randn(),np.pi/2 + np.pi/4 * np.random.randn()])
 R=0.5
 fig, axs = plt.subplots(1)
-pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'red')
-pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'cyan')
+#pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'red')
+#pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'cyan')
 
 '''Control sin CBF'''
-#TODO: Revisar este control porque falla
+
 kw=0.9
 kv=0.015
-r1_star=np.array([9,-5])
-r2_star=np.array([-15,12])
+r1_star=np.array([10,-10])
+r2_star=np.array([-11,12])
 t=0
 dt=0.1
 tf=15
@@ -69,7 +69,8 @@ while i<n-1:
     '''Robot 1'''
     fi=np.arctan2(r1_star[1]-r1[i,1],r1_star[0]-r1[i,0])
     v=kv*np.linalg.norm(r1[i,0:1].T-r1_star.T)**2
-    if np.abs(fi)>0.8:
+    delta=fi-r1[i,2]
+    if np.abs(delta)>0.8:
         v=0
     w=kw*(fi-r1[i,2])
     fi_1[i]=fi
@@ -82,7 +83,7 @@ while i<n-1:
     '''Robot 2'''
     fi=np.arctan2(r2_star[1]-r2[i,1],r2_star[0]-r2[i,0])
     v=kv*np.linalg.norm(r2[i,0:1]-r2_star)**2
-    if np.abs(fi)>0.8:
+    if np.abs(fi-r2[i,2])>0.8:
         v=0
     w=kw*(fi-r2[i,2])
     fi_2[i]=fi
@@ -127,6 +128,8 @@ plt.plot(r1[:,0], r1[:,1],'r')
 plt.plot(r2[:,0], r2[:,1],'b')
 plt.plot(r1_star[0],r1_star[1],'rx')
 plt.plot(r2_star[0],r2_star[1],'bx')
+plt.plot(r1[0,0],r1[0,1],'rs')
+plt.plot(r2[0,0],r2[0,1],'bs')
 red_robot, = plt.plot([], [], 'ro', markersize = 10)
 cyan_robot,= plt.plot([], [], 'bo', markersize = 10)
 plt.xlabel('x')
@@ -231,6 +234,7 @@ plt.ylabel('v(m/s)')
 plt.legend()
 
 '''
+
 #Control con CBF
 i=0
 t=0
@@ -238,7 +242,9 @@ Ds=2
 gamma=0.4
 M = np.array([[1., 0., 0., 0.], [0., 1., 0., 0.], [0., 0., 1., 0.], [0., 0., 0., 1.]])
 P = np.dot(M.T, M)
-#TODO: Revisar, algo no esta bien en la expresion del problema cuadratico
+#TODO: Revisar,creo que lo que pasa es que no hay restricción para omega y si
+# el robot está ya alineado omega es cero y cumple con la restricción así
+# que no cambia y por lo tanto no hay manera de salir de ahí
 # Para comparar las soluciones del optimizador con las propuestas
 v_star=np.zeros([n,4])
 v_opt=np.zeros([n,4])
@@ -249,11 +255,12 @@ while i<n-1:
     #Velocidades objetivos
     fi=np.arctan2(r1_star[1]-r1[i,1],r1_star[0]-r1[i,0])
     v1=kv*np.linalg.norm(r1[i,0:1]-r1_star)**2
-    if np.abs(fi)>0.8:
-        v1=0
+    delta=fi-r1[i,2]
+    if np.abs(delta)>0.8:
+        v=0
     w1=kw*(fi-r1[i,2])
     fi=np.arctan2(r2_star[1]-r2[i,1],r2_star[0]-r2[i,0])
-    if np.abs(fi)>0.8:
+    if np.abs(fi-r2[i,2])>0.8:
         v2=0
     v2=kv*np.linalg.norm(r2[i,0:1]-r2_star)**2
     w2=kw*(fi-r2[i,2])
@@ -292,9 +299,6 @@ while i<n-1:
     r2[i+1,2]=r2[i,2]+dt*sdot[2]
     
     i=i+1
-    pinta_robot_c(r1[i,0], r1[i,1], r1[i,2], R, axs,'r')
-    pinta_robot_c(r2[i,0], r2[i,1], r2[i,2], R, axs,'g')
-    sleep(0.1)
     t=t+dt
 plt.title("With CBF")
 
@@ -310,7 +314,8 @@ plt.plot(r1[:,0], r1[:,1],'r')
 plt.plot(r2[:,0], r2[:,1],'b')
 plt.plot(r1_star[0],r1_star[1],'rx')
 plt.plot(r2_star[0],r2_star[1],'bx')
-
+plt.plot(r1[0,0],r1[0,1],'rs')
+plt.plot(r2[0,0],r2[0,1],'bs')
 red_robot, = plt.plot([], [], 'ro', markersize = 10)
 cyan_robot,= plt.plot([], [], 'bo', markersize = 10)
 plt.xlabel('x')
