@@ -273,6 +273,10 @@ while i<n-1:
     #G = -2*np.array([[dx, dy, -dx,-dy], [dx, dy, -dx,-dy], [dx, dy, -dx,-dy], [dx, dy, -dx,-dy]])
     a1=dx*r1[i,0]*np.cos(r1[i,2])+dy*r1[i,1]*np.sin(r1[i,2])
     a2=-dx*r2[i,0]*np.cos(r2[i,2])-dy*r2[i,1]*np.sin(r2[i,2])
+    #Modelo ampliado
+    #c=cos(r1[i,2])
+    #s=np.sin(r1[i,2])
+    #t1=
     G=2*np.array([a1,0,a2,0])
     #h = gamma*(d1**2-Ds**2)*np.array([1., 1., 1.,1.]).reshape((4,))
     h = np.array([gamma*(d1**2-Ds**2)])
@@ -360,3 +364,5 @@ ax1.plot(t,v_star[:,3],'c:',label='v_control')
 plt.xlabel('t(s)')
 plt.ylabel('w2(rad/s)')
 plt.legend()
+
+

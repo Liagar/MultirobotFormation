@@ -31,4 +31,9 @@ def bicycle(v,w,theta,gamma,B):
     sdot=[xdot,ydot,thetadot,gammadot]
     return sdot
 
-    
+def extended_unicycle(v,w,theta,a):
+    xdot=v*cos(theta)-a*w*sin(theta)
+    ydot=v*sin(theta)+a*w*cos(theta)
+    thetadot=w
+    sdot=[xdot,ydot,thetadot]
+    return sdot    
