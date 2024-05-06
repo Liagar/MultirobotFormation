@@ -251,6 +251,8 @@ v_opt=np.zeros([n,4])
 fig, axs = plt.subplots(1)
 pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'r')
 pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'c')
+a_1=0.01
+a_2=0.01
 while i<n-1:
     #Velocidades objetivos
     fi=np.arctan2(r1_star[1]-r1[i,1],r1_star[0]-r1[i,0])
@@ -271,13 +273,18 @@ while i<n-1:
     q = -np.dot(M.T, np.array([v1, w1, v2,w2]))
     #G = np.array([[1., 0., -1.,0.], [0., 1., 0.,0.], [0., 0., 0.,1.], [-1., 0., 1.,0.]])
     #G = -2*np.array([[dx, dy, -dx,-dy], [dx, dy, -dx,-dy], [dx, dy, -dx,-dy], [dx, dy, -dx,-dy]])
-    a1=dx*r1[i,0]*np.cos(r1[i,2])+dy*r1[i,1]*np.sin(r1[i,2])
-    a2=-dx*r2[i,0]*np.cos(r2[i,2])-dy*r2[i,1]*np.sin(r2[i,2])
+    #a1=dx*r1[i,0]*np.cos(r1[i,2])+dy*r1[i,1]*np.sin(r1[i,2])
+    #a2=-dx*r2[i,0]*np.cos(r2[i,2])-dy*r2[i,1]*np.sin(r2[i,2])
     #Modelo ampliado
-    #c=cos(r1[i,2])
-    #s=np.sin(r1[i,2])
-    #t1=
-    G=2*np.array([a1,0,a2,0])
+    c1=np.cos(r1[i,2])
+    s1=np.sin(r1[i,2])
+    c2=np.cos(r2[i,2])
+    s2=np.sin(r2[i,2])
+    a1=dx*c1+dy*s1
+    a2=-a_1*dx*s1+a_1*dy*c1
+    a3=-dx*c2-dy*s2
+    a4=dx*a_2*s2-dy*a_2*c2
+    G=2*np.array([a1,a2,a3,a4])
     #h = gamma*(d1**2-Ds**2)*np.array([1., 1., 1.,1.]).reshape((4,))
     h = np.array([gamma*(d1**2-Ds**2)])
     problem = Problem(P, q, G, h)
@@ -292,12 +299,12 @@ while i<n-1:
     w1=u[1]
     v2=u[2]
     w2=u[3]
-    sdot=mbm.unicycle(v1,w1,r1[i,2])
+    sdot=mbm.extended_unicycle(v1,w1,r1[i,2], a_1)
     r1[i+1,0]=r1[i,0]+dt*sdot[0]
     r1[i+1,1]=r1[i,1]+dt*sdot[1]
     r1[i+1,2]=r1[i,2]+dt*sdot[2]
     #Robot 2
-    sdot=mbm.unicycle(v2,w2,r2[i,2])
+    sdot=mbm.extended_unicycle(v2,w2,r2[i,2], a_2)
     r2[i+1,0]=r2[i,0]+dt*sdot[0]
     r2[i+1,1]=r2[i,1]+dt*sdot[1]
     r2[i+1,2]=r2[i,2]+dt*sdot[2]
