@@ -9,9 +9,9 @@ Uncerstanding control barrier functions
 import RobotModels as mbm
 import numpy as np
 import matplotlib.pyplot as plt
-from robot_plot_utils import  pinta_robot_c
-from qpsolvers import solve_qp, Problem, solve_problem
-from time import sleep
+ 
+from qpsolvers import Problem, solve_problem
+    
 import matplotlib.animation as manimation
 
 def quadprog_solve_qp(P, q, G, h, A=None, b=None):
@@ -39,10 +39,13 @@ def quadprog_solve_qp(P, q, G, h, A=None, b=None):
     print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")
     return solution
 
-r1i=np.array([-10 + 5 * np.random.randn() ,10 + 5 * np.random.randn(),np.pi/2 + np.pi/4 * np.random.randn()])
-r2i=np.array([10 + 5 * np.random.randn() ,-10 + 5 * np.random.randn(),np.pi/2 + np.pi/4 * np.random.randn()])
+#r1i=np.array([-10 + 5 * np.random.randn() ,10 + 5 * np.random.randn(),np.pi/2 + np.pi/4 * np.random.randn()])
+#r2i=np.array([10 + 5 * np.random.randn() ,-10 + 5 * np.random.randn(),np.pi/2 + np.pi/4 * np.random.randn()])
+r1i=np.array([-10,10,np.pi/2])
+r2i=np.array([10,-10,np.pi/2])
+
 R=0.5
-fig, axs = plt.subplots(1)
+
 #pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'red')
 #pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'cyan')
 
@@ -51,7 +54,7 @@ fig, axs = plt.subplots(1)
 kw=0.9
 kv=0.015
 r1_star=np.array([10,-10])
-r2_star=np.array([-11,12])
+r2_star=np.array([-10,10])
 t=0
 dt=0.1
 tf=15
@@ -96,8 +99,8 @@ while i<n-1:
     r2[i+1,2]=r2[i,2]+dt*sdot[2]
     
     i=i+1
-    pinta_robot_c(r1[i,0], r1[i,1], r1[i,2], R, axs,'r')
-    pinta_robot_c(r2[i,0], r2[i,1], r2[i,2], R, axs,'c')
+    #pinta_robot_c(r1[i,0], r1[i,1], r1[i,2], R, axs,'r')
+    #pinta_robot_c(r2[i,0], r2[i,1], r2[i,2], R, axs,'c')
     t=t+dt
 plt.title("Without CBF")
 fig=plt.subplot(2,2,1)
@@ -238,8 +241,8 @@ plt.legend()
 #Control con CBF
 i=0
 t=0
-Ds=2
-gamma=0.4
+Ds=3
+gamma=1.0  
 M = np.array([[1., 0., 0., 0.], [0., 1., 0., 0.], [0., 0., 1., 0.], [0., 0., 0., 1.]])
 P = np.dot(M.T, M)
 #TODO: Revisar,creo que lo que pasa es que no hay restricción para omega y si
@@ -248,9 +251,9 @@ P = np.dot(M.T, M)
 # Para comparar las soluciones del optimizador con las propuestas
 v_star=np.zeros([n,4])
 v_opt=np.zeros([n,4])
-fig, axs = plt.subplots(1)
-pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'r')
-pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'c')
+
+#pinta_robot_c(r1i[0], r1i[1], r1i[2], R, axs,'r')
+#pinta_robot_c(r2i[0], r2i[1], r2i[2], R, axs,'c')
 a_1=0.01
 a_2=0.01
 while i<n-1:
@@ -311,7 +314,7 @@ while i<n-1:
     
     i=i+1
     t=t+dt
-plt.title("With CBF")
+
 
 #Animacion
 FFMpegWriter = manimation.writers['ffmpeg']
