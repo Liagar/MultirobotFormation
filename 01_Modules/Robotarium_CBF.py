@@ -53,6 +53,10 @@ def quadprog_solve_qp(P, q, G, h, A=None, b=None):
     print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")
     return solution
 
+def cbf_function(x,y,l,a):
+    y=np.cos(np.pi*x/a-0.5)*np.cos(np.pi*y/l-0.5)
+    return y
+
 #Robot arena
 ancho= 50
 largo= 30
@@ -138,7 +142,7 @@ with writer.saving(fig, "Robotarium_Ncbf_1.mp4", 200):
 i=0
 t=0
 Ds=3
-gamma=0.5
+gamma=0.2
 M = np.array([[1., 0.], [0., 1.]])
 P = np.dot(M.T, M)
 #TODO: Revisar al salir de la zona pega un petardazo la velocidad ¿va al revés?
@@ -148,6 +152,7 @@ v_opt=np.zeros([n,2])
 a_1=0.01
 fi=2
 v1=5
+
 while i<n-1:
     #Velocidades objetivos
     ''' Control para ir al objetivo
@@ -163,6 +168,7 @@ while i<n-1:
     fi_1[i]=fi
     vr[i]=v1
     wr[i]=w1
+    
     #CBF
     q = -np.dot(M.T, np.array([v1, w1]))
     #G = np.array([[1., 0., -1.,0.], [0., 1., 0.,0.], [0., 0., 0.,1.], [-1., 0., 1.,0.]])
@@ -178,17 +184,36 @@ while i<n-1:
     s=np.sin(r1[i,2])
     a1=-(np.pi/ancho)*sx*cy*c-(a_1*np.pi/largo)*cx*sy*s
     a2=(a_1*np.pi/ancho)*sx*cy*s+(a_1*np.pi/largo)*cx*sy*c
+    #Cambio de signo toda la desigualdad porque en solver es Gu<=h
     G=np.array([a1,a2])
+    mG=np.array([-a1,-a2])
     #h = gamma*(d1**2-Ds**2)*np.array([1., 1., 1.,1.]).reshape((4,))
-    h = np.array([gamma*(cx*cy)])
-    problem = Problem(P, q, G, h)
-    solution = solve_problem(problem, solver="quadprog")
-    u=solution.x
-    v_opt[i,:]=u
+    hf=cbf_function(r1[i,0], r1[i,1], largo, ancho)
+    h = np.array([-gamma*hf])
+    #Voy a comprobar si el vector u está dentro de Kcbf
+    Lg_h=np.dot(G,q)
+    Kcbf=Lg_h+gamma*hf
+    print("Kcbf: ",Kcbf)
+    if Kcbf<0:
+        problem = Problem(P, q, G, h)
+        solution = solve_problem(problem, solver="quadprog")
+        print(f"Primal: x = {solution.x}")
+        print(f"Dual (Gx <= h): z = {solution.z}")
+        print(f"Dual (Ax == b): y = {solution.y}")
+        print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")
+        u=solution.x
+        print("v: ",v1,"\t w: ",w1,"\t v_opt: ",u[0],"\t w_opt:",u[1])
+        v_opt[i,:]=u
+        v1=u[0]
+        w1=u[1]
+        
+    else:
+        v_opt[i,0]=v1
+        v_opt[i,1]=w1
+        
+    
     v_star[i,0]=v1
     v_star[i,1]=w1
-    v1=u[0]
-    w1=u[1]
     sdot=mbm.extended_unicycle(v1,w1,r1[i,2], a_1)
     r1[i+1,0]=r1[i,0]+dt*sdot[0]
     r1[i+1,1]=r1[i,1]+dt*sdot[1]
