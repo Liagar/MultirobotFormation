@@ -57,6 +57,10 @@ def cbf_function(x,y,l,a):
     y=np.cos(np.pi*x/a-0.5)*np.cos(np.pi*y/l-0.5)
     return y
 
+def cbf_function2(x,y,xc,yc,dx,dy):
+    y=((dx*0.5)**2-(x-xc)**2)*((dy*0.5)**2-(y-yc)**2)
+    return y
+
 #Robot arena
 ancho= 50
 largo= 30
@@ -69,7 +73,7 @@ kv=0.015
 r1_star=np.array([ancho,largo])
 t=0
 dt=0.1
-tf=20
+tf=40
 n=int(tf/dt)
 r1=np.zeros([n,3])
 r1[0,:]=r1i
@@ -101,7 +105,7 @@ while i<n-1:
     i=i+1
     t=t+dt
 
-
+plt.figure()
 fig=plt.subplot(2,1,1)
 plt.title("Without CBF")
 t=np.linspace(0, tf,n)
@@ -142,13 +146,13 @@ with writer.saving(fig, "Robotarium_Ncbf_1.mp4", 200):
 i=0
 t=0
 Ds=3
-gamma=0.2
+gamma=10
 M = np.array([[1., 0.], [0., 1.]])
 P = np.dot(M.T, M)
-#TODO: Revisar al salir de la zona pega un petardazo la velocidad ¿va al revés?
+
 v_star=np.zeros([n,2])
 v_opt=np.zeros([n,2])
-
+h1=np.zeros([n,1])
 a_1=0.01
 fi=2
 v1=5
@@ -176,19 +180,30 @@ while i<n-1:
     #a1=dx*r1[i,0]*np.cos(r1[i,2])+dy*r1[i,1]*np.sin(r1[i,2])
     #a2=-dx*r2[i,0]*np.cos(r2[i,2])-dy*r2[i,1]*np.sin(r2[i,2])
     #Modelo ampliado
-    cx=np.cos(np.pi*(r1[i,0]/ancho-0.5))
+    '''cx=np.cos(np.pi*(r1[i,0]/ancho-0.5))
     cy=np.cos(np.pi*(r1[i,1]/largo-0.5))
     sx=np.sin(np.pi*(r1[i,0]/ancho-0.5))
     sy=np.sin(np.pi*(r1[i,1]/largo-0.5))
     c=np.cos(r1[i,2])
     s=np.sin(r1[i,2])
     a1=-(np.pi/ancho)*sx*cy*c-(a_1*np.pi/largo)*cx*sy*s
-    a2=(a_1*np.pi/ancho)*sx*cy*s+(a_1*np.pi/largo)*cx*sy*c
+    a2=(a_1*np.pi/ancho)*sx*cy*s+(a_1*np.pi/largo)*cx*sy*c'''
+    # Resuelvo con la segunda CBF
+    c=np.cos(r1[i,2])
+    s=np.sin(r1[i,2])
+    xc=largo/2
+    yc=ancho/2
+    dx=(largo*0.5)**2-(r1[i,0]-xc)**2
+    dy=(ancho*0.5)**2-(r1[i,1]-yc)**2
+    a1=-2*dy*(r1[i,0]-xc)*c-2*dx*(r1[i,1]-yc)*s
+    a2=2*a_1*dy*(r1[i,0]-xc)*s-2*a_1*dx*(r1[i,1]-yc)*c
     #Cambio de signo toda la desigualdad porque en solver es Gu<=h
     G=np.array([a1,a2])
     mG=np.array([-a1,-a2])
     #h = gamma*(d1**2-Ds**2)*np.array([1., 1., 1.,1.]).reshape((4,))
-    hf=cbf_function(r1[i,0], r1[i,1], largo, ancho)
+    hf=cbf_function2(r1[i,0], r1[i,1], largo*0.5, ancho*0.5,largo,ancho)
+    h1[i,0]=hf
+    print("cbf= ",hf,"\tx: ",r1[i,0],"\ty: ",r1[i,1])
     h = np.array([-gamma*hf])
     #Voy a comprobar si el vector u está dentro de Kcbf
     Lg_h=np.dot(G,q)
@@ -197,10 +212,10 @@ while i<n-1:
     if Kcbf<0:
         problem = Problem(P, q, G, h)
         solution = solve_problem(problem, solver="quadprog")
-        print(f"Primal: x = {solution.x}")
+        '''print(f"Primal: x = {solution.x}")
         print(f"Dual (Gx <= h): z = {solution.z}")
         print(f"Dual (Ax == b): y = {solution.y}")
-        print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")
+        print(f"Dual (lb <= x <= ub): z_box = {solution.z_box}")'''
         u=solution.x
         print("v: ",v1,"\t w: ",w1,"\t v_opt: ",u[0],"\t w_opt:",u[1])
         v_opt[i,:]=u
@@ -222,6 +237,16 @@ while i<n-1:
     i=i+1
     t=t+dt
 
+plt.figure()
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+X = np.arange(-5, largo+5, 0.25)
+Y = np.arange(-5, ancho+5, 0.25)
+X, Y = np.meshgrid(X, Y)
+Z = cbf_function2(X, Y, xc, yc, ancho, largo)
+
+# Plot the surface.
+surf = ax.plot_surface(X, Y, Z)
+plt.show()
 
 #Animacion
 FFMpegWriter = manimation.writers['ffmpeg']
@@ -239,6 +264,9 @@ plt.fill(arena[:,0],arena[:,1],'c',alpha=0.4)
 red_robot, = plt.plot([], [], 'ro', markersize = 10)
 plt.xlabel('x')
 plt.ylabel('y')
+plt.title("With CBF")
+texto="gamma= "+str(gamma)
+plt.text(2.5,0.8,texto)
 ax.set_ylim(top=10+largo,bottom=-10) 
 ax.set_xlim(right=10+ancho,left=-10) 
 
