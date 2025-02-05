@@ -30,7 +30,7 @@ def matriz_laplaciana(Z,pesos,num_nodos,num_arcos):
     return L
 
 def unstack(ps,m):
-    n, k =np.shape(ps)
+    n =len(ps)
     npuntos=int(n/m)
     p=np.zeros([npuntos,m])
     i=0
