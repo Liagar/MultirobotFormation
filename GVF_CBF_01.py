@@ -134,7 +134,7 @@ def vector_field_CBF(xi,Chi,n,N,R,alpha):
     Chi=gu.unstack(Chi,n+1)
     # Desapilo posiciones
     pi=gu.unstack(xi,n+1)
-    Chi_cbf=np.zeros((N,n))
+    Chi_cbf=np.zeros((N,n+1))
     #Para cada agente
     #Construyo el problema para optimizar
     # min 0.5*Chi_hat'*Chi_hat-Xi'*Chi_hat
@@ -153,15 +153,16 @@ def vector_field_CBF(xi,Chi,n,N,R,alpha):
     #TODO: Revisar el calculo de A y b
     for i in range(N):
         A=np.zeros((N-1,n+1))
-        b=np.zeros((N-1,n+1))
-        for k in range(i):
-            A[k,:]=(pi[k]-pi[i])@P
-            b[k]=alpha*eta[i,k]**3/4.0
-        for k in range(i+1,N-1):
-            A[k-1,:]=(pi[k-1]-pi[i])@P
-            b[k-1]=alpha*eta[i,k-1]**3/4.0
+        b=np.zeros(N-1)
+        s=0
+        for k in range(N-1):
+            if k==i:
+                continue
+            A[s,:]=(pi[k]-pi[i])@P.T
+            b[s]=alpha*eta[i,k]**3/4.0
+            s+=1
         q=-eta
-        Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=None,h=None,A=A,b=b,lb=None,ub=None)
+        Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
     return Chi_cbf
     
  
@@ -205,6 +206,23 @@ alpha=1
 Chi=vector_field(Xi[0],0,ki,n,N,ww,kc,L)
 Chi_hat=vector_field_CBF(Xi[0],Chi,n,N,R,alpha)
 
+''' Pinto para ver qué tal'''
+valores = np.linspace(-4,4,100)
+# La curva es la misma para todos los robots
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+#nuestra curva 
+[x,y,z]=fun(valores)
+ax.plot(x,y,z,color="royalblue",linewidth = 2.5,zorder = 2)
+# Desapilo las posiciones
+pi=gu.unstack(Xi[0],n+1)
+#TODO: revisar el dibujo
+for i in range(N):
+    ax.scatter(pi[i,0],pi[i,1],pi[i,2],linewidth = 2.5, zorder = 3)
+
+    #campo vectorial - gradiente 
+    plt.quiver(pi[i,0],pi[i,1],pi[i,2],Chi[i,0], Chi[i,1], Chi[i,2], color = "olive", zorder = 1)
+    plt.quiver(pi[i,0],pi[i,1],pi[i,2],Chi_hat[i,0], Chi_hat[i,1], Chi_hat[i,2], color = "red", zorder = 1)
 
 '''  
 #resolvemos las ecuación diferencial 
