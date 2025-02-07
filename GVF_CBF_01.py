@@ -15,7 +15,8 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import qp as qp
 import graph_utils as gu
-
+from matplotlib.animation import FuncAnimation
+from mpl_toolkits.mplot3d import Axes3D
 
 class Agente:
     def __init__(self, posicion):
@@ -166,14 +167,18 @@ def vector_field_CBF(xi,Chi,n,N,R,alpha):
     return Chi_cbf
     
  
-   
+def vector_field_completo(xi,t,k,n,N,ww,kc,L):
+    Chi=vector_field(xi,t,ki,n,N,ww,kc,L)
+    Chi_hat=vector_field_CBF(xi,Chi,n,N,R,alpha)
+    xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
+    return xi_eta[0]
   
 #------------------------------------------------------------------------
 
 #Parámetro de simulación 
 n = 3           #dimensiones del espacio
-N =5          #nº de agentes 
-t = np.linspace(0,200,1000) #tiempo de integración 
+N =2          #nº de agentes 
+t = np.linspace(0,1,10) #tiempo de integración 
 ki =[1,1,2] #ganancias 
 
 #coordenadas iniciales de los robots 
@@ -203,43 +208,140 @@ for i in range(N):
     
 R=2
 alpha=1
-Chi=vector_field(Xi[0],0,ki,n,N,ww,kc,L)
-Chi_hat=vector_field_CBF(Xi[0],Chi,n,N,R,alpha)
 
-''' Pinto para ver qué tal'''
+
+#Voy a resolver por Euler para ir parando y viendo los campos
+h=t[1]-t[0]
+sol=np.zeros((len(t)*(n+1)*N))
+Chi=np.zeros((len(t)*(n+1)*N))
+Chi_hat=np.zeros((len(t)*(n+1)*N))
+sol[0:(n+1)*N]=vector_field_completo(Xi[0],t,ki,n,N,ww,kc,L)
 valores = np.linspace(-4,4,100)
 # La curva es la misma para todos los robots
+
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
 #nuestra curva 
 [x,y,z]=fun(valores)
 ax.plot(x,y,z,color="royalblue",linewidth = 2.5,zorder = 2)
+
+intervalo=(n+1)*N
+fin=(len(t)-1)*intervalo
+for i in range(1,fin,intervalo):
+    xi=sol[i-1:i-1+(n+1)*N].copy()
+    Chi[i-1:i-1+(n+1)*N]=vector_field(xi,t,ki,n,N,ww,kc,L)
+    Chi_hat[i-1:i-1+(n+1)*N]=vector_field_completo(xi,t,ki,n,N,ww,kc,L)
+    sol[i-1+(n+1)*N:i-1+2*(n+1)*N]=xi+h*Chi_hat[i-1:i-1+(n+1)*N]
+    pi=gu.unstack(sol[i-1+(n+1)*N:i-1+2*(n+1)*N],n+1)
+    #Desapilo el campo
+    Chi2=gu.unstack(Chi, n+1)
+    Chi2_hat=gu.unstack(Chi_hat,n+1)
+    for j in range(N):
+        ax.scatter(pi[j,0],pi[j,1],pi[j,2],linewidth = 2.5, zorder = 3)
+
+        #campo vectorial - gradiente 
+        plt.quiver(pi[j,0],pi[j,1],pi[j,2],Chi2[j,0], Chi2[j,1], Chi2[j,2], length=1, color = "olive", zorder = 1)
+        plt.quiver(pi[j,0],pi[j,1],pi[j,2],Chi2_hat[j,0], Chi2_hat[j,1], Chi2_hat[j,2], length=1, color = "red", zorder = 1)
+
+
+
+''' Pinto para ver qué tal'''
+'''
 # Desapilo las posiciones
 pi=gu.unstack(Xi[0],n+1)
+#Desapilo el campo
+Chi2=gu.unstack(Chi, n+1)
 #TODO: revisar el dibujo
 for i in range(N):
     ax.scatter(pi[i,0],pi[i,1],pi[i,2],linewidth = 2.5, zorder = 3)
 
     #campo vectorial - gradiente 
-    plt.quiver(pi[i,0],pi[i,1],pi[i,2],Chi[i,0], Chi[i,1], Chi[i,2], color = "olive", zorder = 1)
-    plt.quiver(pi[i,0],pi[i,1],pi[i,2],Chi_hat[i,0], Chi_hat[i,1], Chi_hat[i,2], color = "red", zorder = 1)
+    plt.quiver(pi[i,0],pi[i,1],pi[i,2],Chi2[i,0], Chi2[i,1], Chi2[i,2], length=1, color = "olive", zorder = 1)
+    plt.quiver(pi[i,0],pi[i,1],pi[i,2],Chi_hat[i,0], Chi_hat[i,1], Chi_hat[i,2], length=1, color = "red", zorder = 1)
 
 '''  
-#resolvemos las ecuación diferencial 
-sol = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))
-
 #representación gráfica 
 
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
 
+#resolvemos las ecuación diferencial 
+t = np.linspace(0,100,10000) #tiempo de integración 
+pos = np.random.randint(-50, 51, size=(N, n))
+pos=np.array([[0,10,0],[-1.,10,0]])
+#añadimos a la matriz de posiciones la coordenada virtual w 
+w = np.ones((N,1)) #ejemplo: todos valen 1 
+
+#concatenamos las dos matrices a lo largo de las filas 
+Xi = np.concatenate((pos, w), axis=1)
+Xi = Xi.reshape((N*(n+1),-1)).T #apilamos en un vector
+
+
+sol2 = odeint(vector_field_completo,Xi[0],t,args=(ki,n,N,ww,kc,L))
+sol1 = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))
 lista = np.arange(0,(n+1)*N+1,(n+1))
+
+# Configuración de la figura
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.plot(x,y,z,color="royalblue",linewidth = 2.5,zorder = 2)
+
+
 for i in lista[:-1]: 
-    ax.plot(sol[:,i], sol[:,i+1], sol[:,i+2])
-    ax.scatter(sol[0,i],sol[0,i+1], sol[0,i+2], marker='o')
+    ax.plot(sol1[:,i], sol1[:,i+1], sol1[:,i+2], label='Trayectorias sin CBF')
+    ax.scatter(sol1[0,i],sol1[0,i+1], sol1[0,i+2], marker='o')
+
 
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('z')
 ax.set_title('Trayectoria de los agentes')
-plt.show()'''
+
+
+
+n_frames = 10000
+# Línea y punto que se animarán
+line1, = ax.plot([], [], [], 'b-', label='Trayectoria1')
+point1, = ax.plot([], [], [], 'ro', label='Posición actual1')
+line2, = ax.plot([], [], [], 'm-', label='Trayectoria2')
+point2, = ax.plot([], [], [], 'go', label='Posición actual2')
+ax.legend()
+
+def init():
+    line1.set_data([], [])
+    line1.set_3d_properties([])
+    point1.set_data([], [])
+    point1.set_3d_properties([])
+    line2.set_data([], [])
+    line2.set_3d_properties([])
+    point2.set_data([], [])
+    point2.set_3d_properties([])
+    return line1,line2,point1,point2
+
+def update(frame):
+    line1.set_data(sol2[:frame+1, 0], sol2[:frame+1, 1])
+    line1.set_3d_properties(sol2[:frame+1, 2])
+    point1.set_data(sol2[frame, 0], sol2[frame, 1])
+    point1.set_3d_properties(sol2[frame, 2])
+    line2.set_data(sol2[:frame+1, 4], sol2[:frame+1, 5])
+    line2.set_3d_properties(sol2[:frame+1, 6])
+    point2.set_data(sol2[frame, 4], sol2[frame, 5])
+    point2.set_3d_properties(sol2[frame, 6])
+    return line1, point1,line2,point2
+
+ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=False, interval=100)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
