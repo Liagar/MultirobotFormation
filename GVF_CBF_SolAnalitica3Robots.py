@@ -6,7 +6,7 @@ Created on Wed Feb  5 12:08:19 2025
 @author: lia
 
 GVF +CBF segun la tesis de Weija para evitar choques entre robots
-Version inicial para 2 agentes que se comunican todos entre sí en 2D
+Version inicial para 3 agentes que se comunican todos entre sí en 2D
 
 """
 # TODO: Revisar por qué no funciona la solución analítica ni siquiera GVF normal
@@ -14,13 +14,13 @@ Version inicial para 2 agentes que se comunican todos entre sí en 2D
 import numpy as np
 from scipy.integrate import odeint
 import matplotlib.pyplot as plt
-import qp as qp
+
 import graph_utils as gu
 from matplotlib.animation import FuncAnimation, PillowWriter
 from mpl_toolkits.mplot3d import Axes3D
 
    
-#CASO DE 2 ROBOTS EN UN ESPACIO 2-DIMENSIONAL
+#CASO DE 3 ROBOTS EN UN ESPACIO 2-DIMENSIONAL
 
 #todos los agentes siguen las mismas ecuaciones de trayectoria
 
@@ -134,23 +134,40 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
     Pr[-1,-1]=1
     P=M-Pr
     eta=np.zeros((N,N))
+    dx=np.zeros((N,N)) 
+    dy=np.zeros((N,N)) 
     for i in range(N):
         for j in range(N):
             eta[i,j]=np.linalg.norm(P@(pi[i,:]-pi[j,:]))**2-R**2
-            
-    dx=pi[0,0]-pi[1,0]
-    dy=pi[0,1]-pi[1,1]
-    d2=(dx)**2+(dy)**2
-    lam=(-alpha*eta[0,1]**3+(dx)*Chi[0,0]+dy*Chi[0,1])/(4*d2)
-    lam2=(-alpha*eta[1,0]**3-(dx)*Chi[1,0]-dy*Chi[1,1])/(4*d2)
+            dx[i,j]=pi[i,0]-pi[j,0]
+            dy[i,j]=pi[i,1]-pi[j,1]
+    #TODO Hay que hacerlo para todos los agentes
+    P=np.zeros((N,N-1,N-1)) 
+    P=np.array([[[-dx[0,1], -dx[0,2]],[-dy[0,1],-dy[0,2]]],
+                [[-dx[1,0], -dx[1,2]],[-dy[1,0],-dy[1,2]]],
+                [[-dx[2,0], -dx[2,1]],[-dy[2,0],-dy[2,1]]]])
+    M=np.zeros((2*n,2*n))
+    for i in range(N):
+        Pi=P[i,:,:]
+        Pt=Pi.T
+        Pt_inv=np.linalg.inv(Pt)
+        P_inv=np.linalg.inv(Pi)
+        M[0:2,2:4]=Pt_inv
+        M[2:4,0:2]=P_inv
+        M[2:4,2:4]=-P_inv@Pt_inv
+        k=i+1
+        k2=k+1
+        if k==3:
+            k=0
+            k2=1
+        elif k==2:
+            k=0
+            k2=2
+        b=np.array([Chi_ap[i],Chi_ap[i+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
 
-    Chi_cbf[0,0]=Chi[0,0]+lam*dx
-    Chi_cbf[0,1]=Chi[0,1]+lam*dy
-    Chi_cbf[0,2]=Chi[0,2]
-    Chi_cbf[1,0]=Chi[1,0]-lam2*dx
-    Chi_cbf[1,1]=Chi[1,1]-lam2*dy
-    Chi_cbf[1,2]=Chi[1,2]
-    
+        S=np.linalg.inv(M)@b
+        Chi_cbf[i,2]=Chi[i,2]
+        Chi_cbf[i,0:2]=S[0:2]
         #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
     return Chi_cbf
     
@@ -167,14 +184,14 @@ def vector_field_completo(xi,t,k,n,N,ww,kc,L):
 
 #Parámetro de simulación 
 n = 2           #dimensiones del espacio
-N =2          #nº de agentes 
+N =3          #nº de agentes 
 ki =[1,1] #ganancias 
 
 #coordenadas iniciales de los robots 
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-10.0,-10],[10.,10]])
+pos=np.array([[-10.0,-10],[-10.,-9.0],[-11,-11]])
 
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -202,7 +219,7 @@ alpha=1
 
 
 #resolvemos las ecuación diferencial 
-t = np.linspace(0,20,1000) #tiempo de integración 
+t = np.linspace(0,100,1000) #tiempo de integración 
 
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -223,11 +240,12 @@ valores = np.linspace(-4,4,100)
 [x,y]=fun(valores)
 ax.plot(x,y,color="royalblue",linewidth = 2.5,zorder = 2)
 
-
+'''
 for i in lista[:-1]: 
     ax.plot(sol1[:,i], sol1[:,i+1], 'k-',label='Trayectorias sin CBF')
     ax.scatter(sol1[0,i],sol1[0,i+1],marker='o')
 
+'''
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 
@@ -241,6 +259,8 @@ line1, = ax.plot([], [], 'b-', label='Trayectoria1')
 point1, = ax.plot([], [], 'ro', label='Posición actual1')
 line2, = ax.plot([], [], 'm-', label='Trayectoria2')
 point2, = ax.plot([], [], 'go', label='Posición actual2')
+line3, = ax.plot([], [], 'm-', label='Trayectoria3')
+point3, = ax.plot([], [], 'go', label='Posición actual3')
 
 #ax.legend(loc='upper right')
 
@@ -249,14 +269,20 @@ def init():
     point1.set_data([], [])
     line2.set_data([], [])
     point2.set_data([], [])
+    line3.set_data([], [])
+    point3.set_data([], [])
+    
   
-    return line1,line2,point1,point2
+    return line1,line2,line3,point1,point2,point3
 
 def update(frame):
     line1.set_data(sol2[:frame+1, 0], sol2[:frame+1, 1])
     point1.set_data(sol2[frame, 0], sol2[frame, 1])
     line2.set_data(sol2[:frame+1, 3], sol2[:frame+1, 4])
     point2.set_data(sol2[frame, 3], sol2[frame, 4])
+    line2.set_data(sol2[:frame+1, 6], sol2[:frame+1, 7])
+    point2.set_data(sol2[frame, 6], sol2[frame, 7])
+    
     return line1, point1,line2,point2
 
 ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=False, interval=50)
