@@ -147,6 +147,7 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
                 [[-dx[1,0], -dx[1,2]],[-dy[1,0],-dy[1,2]]],
                 [[-dx[2,0], -dx[2,1]],[-dy[2,0],-dy[2,1]]]])
     M=np.zeros((2*n,2*n))
+    agente=0
     for i in range(N):
         Pi=P[i,:,:]
         Pt=Pi.T
@@ -155,6 +156,11 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
         M[0:2,2:4]=Pt_inv
         M[2:4,0:2]=P_inv
         M[2:4,2:4]=-P_inv@Pt_inv
+        cond=np.linalg.cond(M)
+        if np.linalg.cond(M)>50:
+            print("Mal condicionada")
+            Chi_cbf[i,:]=Chi[i,:]
+            continue
         k=i+1
         k2=k+1
         if k==3:
@@ -163,13 +169,14 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
         elif k==2:
             k=0
             k2=2
-        b=np.array([Chi_ap[i],Chi_ap[i+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
-
+        b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
+        agente=agente+3
         S=np.linalg.inv(M)@b
-        Chi_cbf[i,2]=Chi[i,2]
         Chi_cbf[i,0:2]=S[0:2]
         #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
-    return Chi_cbf
+    Chi_cbf[:,2]=Chi[:,2]
+    Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
+    return Chi_cbf_ap
     
  
 def vector_field_completo(xi,t,k,n,N,ww,kc,L):
@@ -219,8 +226,9 @@ alpha=1
 
 
 #resolvemos las ecuación diferencial 
-t = np.linspace(0,100,1000) #tiempo de integración 
-
+t = np.linspace(0,10,1000) #tiempo de integración 
+h=t[1]-t[0]
+nf=len(t)
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
 
@@ -229,8 +237,21 @@ Xi = np.concatenate((pos, w), axis=1)
 Xi = Xi.reshape((N*(n+1),-1)).T #apilamos en un vector
 
 
-sol2 = odeint(vector_field_completo,Xi[0],t,args=(ki,n,N,ww,kc,L))
-sol1 = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))
+'''sol2 = odeint(vector_field_completo,Xi[0],t,args=(ki,n,N,ww,kc,L))
+sol1 = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))'''
+
+#Integro con Euler para ver qué pasa
+sol2=np.zeros((nf,(n+1)*N))
+sol1=np.zeros((nf,(n+1)*N))
+sol2[0,:]=Xi[0]
+sol1[0,:]=Xi[0]
+R=2
+alpha=1
+#TODO Revisar omega porque crece una barbaridad
+for i in range(nf-1):
+    sol1[i+1,:]=sol1[i,:]+h*vector_field(sol1[i,:],t[i],ki,n,N,ww,kc,L)
+    sol2[i+1,:]=sol2[i,:]+h*vector_field_CBF(sol2[i,:],sol1[i,:],n,N,R,alpha)
+
 lista = np.arange(0,(n+1)*N+1,(n+1))
 
 # Configuración de la figura
