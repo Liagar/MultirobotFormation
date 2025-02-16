@@ -107,7 +107,7 @@ def vector_field(xi,t,k,n,N,ww,kc,L):
 
     return xi_eta[0]
 
-
+#TODO: Revisar y entender bien el problema porque algo se me escapa
 
 def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
     #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
@@ -143,9 +143,9 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
             dy[i,j]=pi[i,1]-pi[j,1]
     #TODO Hay que hacerlo para todos los agentes
     P=np.zeros((N,N-1,N-1)) 
-    P=np.array([[[-dx[0,1], -dx[0,2]],[-dy[0,1],-dy[0,2]]],
-                [[-dx[1,0], -dx[1,2]],[-dy[1,0],-dy[1,2]]],
-                [[-dx[2,0], -dx[2,1]],[-dy[2,0],-dy[2,1]]]])
+    P=np.array([[[-dx[1,0], -dx[2,0]],[-dy[1,0],-dy[2,0]]],
+                [[-dx[0,1], -dx[2,1]],[-dy[0,1],-dy[2,1]]],
+                [[-dx[0,2], -dx[1,2]],[-dy[0,2],-dy[1,2]]]])
     M=np.zeros((2*n,2*n))
     agente=0
     for i in range(N):
@@ -171,10 +171,24 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
             k2=2
         b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
         agente=agente+3
-        S=np.linalg.inv(M)@b
+        S=M@b
         Chi_cbf[i,0:2]=S[0:2]
         #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
     Chi_cbf[:,2]=Chi[:,2]
+    
+    #Voy a comprobar la condicion
+    for i in range(N): # Para cada agente
+        if i==0:
+            ks=[1,2]
+        elif i==1:
+            ks=[0,2]
+        else:
+            ks=[0,1]
+        for k in ks:
+            c1=Chi_cbf[i,0]*(dx[i,k])+Chi_cbf[i,1]*(dy[i,k])
+            c2=alpha*eta[i,k]**3/4
+            #print(c1,c2)
+        
     Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
     return Chi_cbf_ap
     
@@ -198,7 +212,7 @@ ki =[1,1] #ganancias
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-10.0,-10],[-10.,-9.0],[-11,-11]])
+pos=np.array([[-10.0,-10],[-9.5,-9.0],[5,0]])
 
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -237,20 +251,8 @@ Xi = np.concatenate((pos, w), axis=1)
 Xi = Xi.reshape((N*(n+1),-1)).T #apilamos en un vector
 
 
-'''sol2 = odeint(vector_field_completo,Xi[0],t,args=(ki,n,N,ww,kc,L))
-sol1 = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))'''
-
-#Integro con Euler para ver qué pasa
-sol2=np.zeros((nf,(n+1)*N))
-sol1=np.zeros((nf,(n+1)*N))
-sol2[0,:]=Xi[0]
-sol1[0,:]=Xi[0]
-R=2
-alpha=1
-#TODO Revisar omega porque crece una barbaridad
-for i in range(nf-1):
-    sol1[i+1,:]=sol1[i,:]+h*vector_field(sol1[i,:],t[i],ki,n,N,ww,kc,L)
-    sol2[i+1,:]=sol2[i,:]+h*vector_field_CBF(sol2[i,:],sol1[i,:],n,N,R,alpha)
+sol2 = odeint(vector_field_completo,Xi[0],t,args=(ki,n,N,ww,kc,L))
+sol1 = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))
 
 lista = np.arange(0,(n+1)*N+1,(n+1))
 
@@ -265,7 +267,6 @@ ax.plot(x,y,color="royalblue",linewidth = 2.5,zorder = 2)
 for i in lista[:-1]: 
     ax.plot(sol1[:,i], sol1[:,i+1], 'k-',label='Trayectorias sin CBF')
     ax.scatter(sol1[0,i],sol1[0,i+1],marker='o')
-
 '''
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -301,12 +302,12 @@ def update(frame):
     point1.set_data(sol2[frame, 0], sol2[frame, 1])
     line2.set_data(sol2[:frame+1, 3], sol2[:frame+1, 4])
     point2.set_data(sol2[frame, 3], sol2[frame, 4])
-    line2.set_data(sol2[:frame+1, 6], sol2[:frame+1, 7])
-    point2.set_data(sol2[frame, 6], sol2[frame, 7])
-    
-    return line1, point1,line2,point2
+    line3.set_data(sol2[:frame+1, 6], sol2[:frame+1, 7])
+    point3.set_data(sol2[frame, 6], sol2[frame, 7])
+  
+    return line1, point1,line2,point2,line3,point3
 
-ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=False, interval=50)
+ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=False, interval=100)
 # Guardar animación como GIF
 ani.save("animacion.gif", writer=PillowWriter(fps=10))
 plt.show()
