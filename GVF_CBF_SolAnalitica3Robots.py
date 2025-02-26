@@ -109,7 +109,7 @@ def vector_field(xi,t,k,n,N,ww,kc,L):
 
 #TODO: Revisar y entender bien el problema porque algo se me escapa
 
-def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
+def vector_field_CBF(xi,Chi_ap,n,N,R,alpha,vecinos):
     #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
     #eta: campo guiado para todos los agentes
     #k: ganancias positivas
@@ -117,6 +117,7 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
     #N: nº de agentes 
     #R: distancia de seguridad entre los robots
     #alpha: ganancia de la barrera
+    #vecinos: matriz con los indices de los vecinos de cada robot
     # Desapilo el campo (cuidado que lleva la coordenada ampliada)
     Chi=gu.unstack(Chi_ap,n+1)
     # Desapilo posiciones
@@ -137,10 +138,11 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
     dx=np.zeros((N,N)) 
     dy=np.zeros((N,N)) 
     for i in range(N):
-        for j in range(N):
-            eta[i,j]=np.linalg.norm(P@(pi[i,:]-pi[j,:]))**2-R**2
-            dx[i,j]=pi[i,0]-pi[j,0]
-            dy[i,j]=pi[i,1]-pi[j,1]
+        nvecinos=len(vecinos[i,:])
+        for j in range(nvecinos):
+            eta[i,vecinos[i,j]]=np.linalg.norm(P@(pi[i,:]-pi[vecinos[i,j],:]))**2-R**2
+            dx[i,vecinos[i,j]]=pi[i,0]-pi[vecinos[i,j],0]
+            dy[i,vecinos[i,j]]=pi[i,1]-pi[vecinos[i,j],1]
     #TODO Hay que hacerlo para todos los agentes
     P=np.zeros((N,N-1,N-1)) 
     P=np.array([[[-dx[1,0], -dx[2,0]],[-dy[1,0],-dy[2,0]]],
@@ -148,56 +150,66 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
                 [[-dx[0,2], -dx[1,2]],[-dy[0,2],-dy[1,2]]]])
     M=np.zeros((2*n,2*n))
     agente=0
+    Aj=np.zeros((1,N-1))
+   
+    condicion=np.zeros(N)
     for i in range(N):
         Pi=P[i,:,:]
-        Pt=Pi.T
-        Pt_inv=np.linalg.inv(Pt)
-        P_inv=np.linalg.inv(Pi)
-        M[0:2,2:4]=Pt_inv
-        M[2:4,0:2]=P_inv
-        M[2:4,2:4]=-P_inv@Pt_inv
-        cond=np.linalg.cond(M)
-        if np.linalg.cond(M)>50:
-            print("Mal condicionada")
-            Chi_cbf[i,:]=Chi[i,:]
-            continue
-        k=i+1
-        k2=k+1
-        if k==3:
-            k=0
-            k2=1
-        elif k==2:
-            k=0
-            k2=2
-        b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
-        agente=agente+3
-        S=M@b
-        Chi_cbf[i,0:2]=S[0:2]
+        #Veo si el campo de seguimiento verifica la condición
+        for j in range(2): #porque tiene 2 vecinos
+           Aj[0,0]=dx[i,vecinos[i,j]]
+           Aj[0,1]=dy[i,vecinos[i,j]]
+           c1=Aj@Chi_ap[agente:agente+2]
+           c2=alpha*eta[i,vecinos[i,j]]**3/4
+           if c1<=c2:
+               condicion[i]=condicion[i]+1
+           else:
+               print("No se cumple")
+        if condicion[i]==2:
+            Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
+            agente=agente+3
+        else:
+            print("CBF")
+            Pt=Pi.T
+            Pt_inv=np.linalg.inv(Pt)
+            P_inv=np.linalg.inv(Pi)
+            M[0:2,2:4]=Pt_inv
+            M[2:4,0:2]=P_inv
+            M[2:4,2:4]=-P_inv@Pt_inv
+            k=i+1
+            k2=k+1
+            if k==3:
+                k=0
+                k2=1
+            elif k==2:
+                k=0
+                k2=2
+            if (eta[i,k]<0) and (eta[i,k2]<0):
+                b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
+                agente=agente+3
+                S=M@b
+                Chi_cbf[i,0:2]=S[0:2]
+            else: 
+                Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
+            agente=agente+3
         #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
+
     Chi_cbf[:,2]=Chi[:,2]
     
-    #Voy a comprobar la condicion
-    for i in range(N): # Para cada agente
-        if i==0:
-            ks=[1,2]
-        elif i==1:
-            ks=[0,2]
-        else:
-            ks=[0,1]
-        for k in ks:
-            c1=Chi_cbf[i,0]*(dx[i,k])+Chi_cbf[i,1]*(dy[i,k])
-            c2=alpha*eta[i,k]**3/4
-            #print(c1,c2)
+ 
         
     Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
     return Chi_cbf_ap
     
  
 def vector_field_completo(xi,t,k,n,N,ww,kc,L):
-    alpha=1
+    alpha=0.001
     R=2
+    #TODO una lista con los vecinos de cada robot
+    vecinos=np.zeros((N,N-1))
+    vecinos=np.array([[1,2],[0,2],[0,1]])
     Chi=vector_field(xi,t,ki,n,N,ww,kc,L)
-    Chi_hat=vector_field_CBF(xi,Chi,n,N,R,alpha)
+    Chi_hat=vector_field_CBF(xi,Chi,n,N,R,alpha,vecinos)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
   
@@ -212,7 +224,7 @@ ki =[1,1] #ganancias
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-10.0,-10],[-9.5,-9.0],[5,0]])
+pos=np.array([[-15.0,0],[-14,-0],[10,10]])
 
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -234,7 +246,7 @@ for i in range(N):
     ww[i] = i*Delta
     
 R=2
-alpha=1
+alpha=0.1
 
 #representación gráfica 
 

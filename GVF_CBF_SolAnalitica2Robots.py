@@ -133,7 +133,7 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
     Pr=np.zeros((n+1,n+1))
     Pr[-1,-1]=1
     P=M-Pr
-    eta=np.zeros((N,N))
+    eta=np.zeros((N+1,N+1))
     for i in range(N):
         for j in range(N):
             eta[i,j]=np.linalg.norm(P@(pi[i,:]-pi[j,:]))**2-R**2
