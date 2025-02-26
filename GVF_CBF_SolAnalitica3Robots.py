@@ -9,15 +9,13 @@ GVF +CBF segun la tesis de Weija para evitar choques entre robots
 Version inicial para 3 agentes que se comunican todos entre sí en 2D
 
 """
-# TODO: Revisar por qué no funciona la solución analítica ni siquiera GVF normal
 
 import numpy as np
-from scipy.integrate import odeint
+from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
 import graph_utils as gu
 from matplotlib.animation import FuncAnimation, PillowWriter
-from mpl_toolkits.mplot3d import Axes3D
 
    
 #CASO DE 3 ROBOTS EN UN ESPACIO 2-DIMENSIONAL
@@ -64,7 +62,7 @@ def grafo_L(N):
     
     return L
 
-def vector_field(xi,t,k,n,N,ww,kc,L):
+def vector_field(t,xi,k,n,N,ww,kc,L):
     #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
     #t: tiempo
     #k: ganancias positivas
@@ -107,9 +105,9 @@ def vector_field(xi,t,k,n,N,ww,kc,L):
 
     return xi_eta[0]
 
-#TODO: Revisar y entender bien el problema porque algo se me escapa
+    #TODO: Revisar y entender bien el problema porque algo se me escapa
 
-def vector_field_CBF(xi,Chi_ap,n,N,R,alpha,vecinos):
+def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
     #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
     #eta: campo guiado para todos los agentes
     #k: ganancias positivas
@@ -156,20 +154,23 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha,vecinos):
     for i in range(N):
         Pi=P[i,:,:]
         #Veo si el campo de seguimiento verifica la condición
+        #TODO Revisar esto
         for j in range(2): #porque tiene 2 vecinos
            Aj[0,0]=dx[i,vecinos[i,j]]
            Aj[0,1]=dy[i,vecinos[i,j]]
            c1=Aj@Chi_ap[agente:agente+2]
            c2=alpha*eta[i,vecinos[i,j]]**3/4
-           if c1<=c2:
+           print(c1[0],c2)
+           if c1[0]<=c2:
                condicion[i]=condicion[i]+1
            else:
                print("No se cumple")
         if condicion[i]==2:
             Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
+            print("Chi_pf. Agente ",i)
             agente=agente+3
         else:
-            print("CBF")
+            print("CBF. Agente ",i)
             Pt=Pi.T
             Pt_inv=np.linalg.inv(Pt)
             P_inv=np.linalg.inv(Pi)
@@ -184,9 +185,8 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha,vecinos):
             elif k==2:
                 k=0
                 k2=2
-            if (eta[i,k]<0) and (eta[i,k2]<0):
-                b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])
-                agente=agente+3
+            if (eta[i,k]<0) or (eta[i,k2]<0):
+                b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
                 S=M@b
                 Chi_cbf[i,0:2]=S[0:2]
             else: 
@@ -199,17 +199,19 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha,vecinos):
  
         
     Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
+    print("Chi_cbf",Chi_cbf_ap)
+    print("Chi_pf",Chi_ap)
     return Chi_cbf_ap
     
  
-def vector_field_completo(xi,t,k,n,N,ww,kc,L):
-    alpha=0.001
+def vector_field_completo(t,xi,k,n,N,ww,kc,L):
+    alpha=0.00001
     R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
     vecinos=np.array([[1,2],[0,2],[0,1]])
-    Chi=vector_field(xi,t,ki,n,N,ww,kc,L)
-    Chi_hat=vector_field_CBF(xi,Chi,n,N,R,alpha,vecinos)
+    Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
+    Chi_hat=vector_field_CBF(t,xi,Chi,n,N,R,alpha,vecinos)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
   
@@ -224,7 +226,7 @@ ki =[1,1] #ganancias
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-15.0,0],[-14,-0],[10,10]])
+pos=np.array([[-15.0,0],[-10,-0],[10,10]])
 
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -245,14 +247,13 @@ ww = np.zeros(N)
 for i in range(N):
     ww[i] = i*Delta
     
-R=2
-alpha=0.1
 
 #representación gráfica 
 
 
 #resolvemos las ecuación diferencial 
-t = np.linspace(0,10,1000) #tiempo de integración 
+t = np.linspace(0,5,100) #tiempo de integración 
+tspan=[0,10]
 h=t[1]-t[0]
 nf=len(t)
 #añadimos a la matriz de posiciones la coordenada virtual w 
@@ -263,12 +264,30 @@ Xi = np.concatenate((pos, w), axis=1)
 Xi = Xi.reshape((N*(n+1),-1)).T #apilamos en un vector
 
 
-sol2 = odeint(vector_field_completo,Xi[0],t,args=(ki,n,N,ww,kc,L))
-sol1 = odeint(vector_field,Xi[0],t,args=(ki,n,N,ww,kc,L))
+sol2 = solve_ivp(vector_field_completo,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
+sol1 = solve_ivp(vector_field,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
 
 lista = np.arange(0,(n+1)*N+1,(n+1))
 
+plt.subplot(2,1,1)
+plt.plot(sol1.t,sol1.y[0,:],'r.',sol2.t,sol2.y[0,:],'b')
+plt.subplot(2,1,2)
+plt.plot(sol1.t,sol1.y[1,:],'r.',sol2.t,sol2.y[1,:],'b')
+
+plt.figure()
+plt.subplot(2,1,1)
+plt.plot(sol1.t,sol1.y[3,:],'r.',sol2.t,sol2.y[3,:],'b.')
+plt.subplot(2,1,2)
+plt.plot(sol1.t,sol1.y[4,:],'r.',sol2.t,sol2.y[4,:],'b.')
+
+plt.figure()
+plt.subplot(2,1,1)
+plt.plot(sol1.t,sol1.y[6,:],'r.',sol2.t,sol2.y[6,:],'b.')
+plt.subplot(2,1,2)
+plt.plot(sol1.t,sol1.y[7,:],'r.',sol2.t,sol2.y[7,:],'b.')
+
 # Configuración de la figura
+
 fig = plt.figure()
 ax = fig.add_subplot(111)
 valores = np.linspace(-4,4,100)
@@ -284,16 +303,22 @@ ax.set_xlabel('x')
 ax.set_ylabel('y')
 
 ax.set_title('Trayectoria de los agentes')
+colores=['m.','c.','g.']
+k=0
+for i in lista[:-1]: 
+    ax.plot(sol2.y[i,:], sol2.y[i+1,:],colores[k])
+    ax.plot(sol1.y[i,:], sol1.y[i+1,:], 'k-')
+    ax.scatter(sol2.y[i,0],sol2.y[i+1,0],marker='o')
+    k=k+1
 
-
-
+'''
 n_frames = 1000
 # Línea y punto que se animarán
-line1, = ax.plot([], [], 'b-', label='Trayectoria1')
+line1, = ax.plot([], [], 'r-', label='Trayectoria1')
 point1, = ax.plot([], [], 'ro', label='Posición actual1')
 line2, = ax.plot([], [], 'm-', label='Trayectoria2')
-point2, = ax.plot([], [], 'go', label='Posición actual2')
-line3, = ax.plot([], [], 'm-', label='Trayectoria3')
+point2, = ax.plot([], [], 'mo', label='Posición actual2')
+line3, = ax.plot([], [], 'g-', label='Trayectoria3')
 point3, = ax.plot([], [], 'go', label='Posición actual3')
 
 #ax.legend(loc='upper right')
@@ -324,7 +349,7 @@ ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=False, in
 ani.save("animacion.gif", writer=PillowWriter(fps=10))
 plt.show()
 
-
+'''
 
 
 
