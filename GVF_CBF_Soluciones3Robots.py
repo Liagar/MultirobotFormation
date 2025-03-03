@@ -108,7 +108,7 @@ def vector_field(t,xi,k,n,N,ww,kc,L):
 
     #TODO: Revisar y entender bien el problema porque algo se me escapa
 
-def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
+def vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
     #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
     #eta: campo guiado para todos los agentes
     #k: ganancias positivas
@@ -118,6 +118,7 @@ def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
     #alpha: ganancia de la barrera
     #vecinos: matriz con los indices de los vecinos de cada robot
     # Desapilo el campo (cuidado que lleva la coordenada ampliada)
+    Chi_ap=vector_field(t,xi,k,n,N,ww,kc,L)
     Chi=gu.unstack(Chi_ap,n+1)
     # Desapilo posiciones
     pi=gu.unstack(xi,n+1)
@@ -166,7 +167,7 @@ def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
            #else:
            #    print("No se cumple")
         if condicion[i]==2:
-            Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
+            Chi_cbf[i,0:3]=Chi_ap[agente:agente+3]
             #print("Chi_pf. Agente ",i)
             agente=agente+3
         else:
@@ -189,35 +190,13 @@ def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
                 b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
                 S=M@b
                 Chi_cbf[i,0:2]=S[0:2]
-                #Calculo la coordenada virtual para cada agente con el campo CBF
-                lista = np.arange(0,(n+1)*N+1,(n+1))
-                k = k*N
+                dum=Chi_ap[agente+2]
+                Chi_cbf[i,2]=dum
 
-                PHI = np.zeros(n*N) #lista vacía de funciones surface
-                df = np.zeros(n*N)  #lista vacía de las derivadas 
-                w = np.zeros(N)     #lista vacía para las coordenadas virtuales
-                j = 0 
-                for l in lista[:-1]: 
-                    x = xi[l:l+(n+1)]               #coordenada inicial + virtual de cada agente
-                    PHI[l-j:(l-j)+n] = phi(x)       #función surface 
-                    df[l-j:(l-j)+n] = d_fun(x[-1])  #derivada 
-                    w[j] = x[-1]                    #coordenadas virtuales 
-                    j += 1
-
-                #sumatorio
-
-                l = k*PHI*df
-                # Convertir la matriz l en una matriz de n filas
-                matriz_l = l.reshape((N, -1))
-                #sumar a los largo del eje de las filas 
-                suma = np.sum(matriz_l, axis=1)
-
-                #función de coordinación 
-                c = -L@np.transpose(w-ww)
-                Chi_cbf[i,2] = ((-1)**n+suma+kc*c)[2]
             else: 
                 Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
-                Chi_cbf[:,2]=Chi[:,2]
+                dum=Chi_ap[agente+2]
+                Chi_cbf[i,2]=dum
 
             agente=agente+3
         #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
@@ -286,8 +265,8 @@ def vector_field_completo(t,xi,k,n,N,ww,kc,L):
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
     vecinos=np.array([[1,2],[0,2],[0,1]])
-    Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
-    Chi_hat=vector_field_CBF(t,xi,Chi,n,N,R,alpha,vecinos)
+    #Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
+    Chi_hat=vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
   
@@ -355,6 +334,62 @@ sol1 = solve_ivp(vector_field,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
 sol3 = solve_ivp(vector_field_completoNum,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
 
 lista = np.arange(0,(n+1)*N+1,(n+1))
+'''
+plt.figure()
+plt.subplot(3,1,1)
+plt.plot(sol1.t,sol1.y[0,:],'r.',label='Sin CBF') 
+plt.plot(sol2.t,sol2.y[0,:],'b', label='CBF analítico') 
+plt.plot(sol3.t, sol3.y[0,:],'g',label='CBF numérico')
+plt.title("Evolucion de la coordenada x. Agente 1")
+plt.legend()
+plt.xlabel("t(s)")
+plt.ylabel("x(m)")
+
+plt.subplot(3,1,2)
+plt.plot(sol1.t,sol1.y[3,:],'r.',label='Sin CBF') 
+plt.plot(sol2.t,sol2.y[3,:],'b', label='CBF analítico') 
+plt.plot(sol3.t, sol3.y[3,:],'g',label='CBF numérico')
+plt.title("Evolucion de la coordenada x. Agente 2")
+plt.legend()
+plt.xlabel("t(s)")
+plt.ylabel("x(m)")
+
+plt.subplot(3,1,3)
+plt.plot(sol1.t,sol1.y[6,:],'r.',label='Sin CBF') 
+plt.plot(sol2.t,sol2.y[6,:],'b', label='CBF analítico') 
+plt.plot(sol3.t, sol3.y[6,:],'g',label='CBF numérico')
+plt.title("Evolucion de la coordenada x. Agente 3")
+plt.legend()
+plt.xlabel("t(s)")
+plt.ylabel("x(m)")
+
+plt.figure()
+plt.subplot(3,1,1)
+plt.plot(sol1.t,sol1.y[1,:],'r.',label='Sin CBF') 
+plt.plot(sol2.t,sol2.y[1,:],'b', label='CBF analítico') 
+plt.plot(sol3.t, sol3.y[1,:],'g',label='CBF numérico')
+plt.title("Evolucion de la coordenada y. Agente 1")
+plt.legend()
+plt.xlabel("t(s)")
+plt.ylabel("y(m)")
+
+plt.subplot(3,1,2)
+plt.plot(sol1.t,sol1.y[4,:],'r.',label='Sin CBF') 
+plt.plot(sol2.t,sol2.y[4,:],'b', label='CBF analítico') 
+plt.plot(sol3.t, sol3.y[4,:],'g',label='CBF numérico')
+plt.title("Evolucion de la coordenada y. Agente 2")
+plt.legend()
+plt.xlabel("t(s)")
+plt.ylabel("y(m)")
+
+plt.subplot(3,1,3)
+plt.plot(sol1.t,sol1.y[7,:],'r.',label='Sin CBF') 
+plt.plot(sol2.t,sol2.y[7,:],'b', label='CBF analítico') 
+plt.plot(sol3.t, sol3.y[7,:],'g',label='CBF numérico')
+plt.title("Evolucion de la coordenada y. Agente 3")
+plt.legend()
+plt.xlabel("t(s)")
+plt.ylabel("y(m)")
 
 plt.figure()
 plt.subplot(3,1,1)
@@ -383,9 +418,10 @@ plt.title("Evolucion de la coordenada virtual. Agente 3")
 plt.legend()
 plt.xlabel("t(s)")
 plt.ylabel("omega")
-
+'''
 
 '''
+#Animacion 3D
 fig, ax = plt.subplots()
 ax = fig.add_subplot(111, projection='3d')
 valores = np.linspace(-4,4,100)
@@ -573,8 +609,172 @@ writer = animation.FFMpegWriter(fps=30, bitrate=1800)
 ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
-
 '''
+
+#2D
+fig, ax = plt.subplots()
+ax = fig.add_subplot(111)
+valores = np.linspace(-4,4,100)
+[x,y]=fun(valores)
+ax.plot(x,y,color="royalblue",linewidth = 2.5,zorder = 2)
+ax.set_xlim(-25, 25)
+ax.set_ylim(-25, 25)
+n_frames = len(sol2.t)-2
+# Línea y punto que se animarán
+line1, = ax.plot([], [], 'r-', label='Trayectoria1')
+point1, = ax.plot([], [], 'ro', label='Posición actual1')
+line2, = ax.plot([], [], 'm-', label='Trayectoria2')
+point2, = ax.plot([], [], 'mo', label='Posición actual2')
+line3, = ax.plot([], [], 'g-', label='Trayectoria3')
+point3, = ax.plot([], [], 'go', label='Posición actual3')
+
+ax.set_title("Solucion analítica")
+#ax.legend(loc='upper right')
+
+def init():
+    line1.set_data([], [])
+    point1.set_data([], [])
+    line2.set_data([], [])
+    point2.set_data([], [])
+    line3.set_data([], [])
+    point3.set_data([], [])
+    
+  
+    return line1,line2,line3,point1,point2,point3
+
+def update(frame):
+    line1.set_data(sol2.y[0,:frame+1], sol2.y[1,:frame+1])
+    point1.set_data(sol2.y[0,frame], sol2.y[1,frame])
+    line2.set_data(sol2.y[3,:frame+1], sol2.y[4,:frame+1])
+    point2.set_data(sol2.y[3,frame], sol2.y[4,frame])
+    line3.set_data(sol2.y[6,:frame+1], sol2.y[7,:frame+1])
+    point3.set_data(sol2.y[6,frame], sol2.y[7,frame])
+    return line1, point1,line2,point2,line3,point3
+
+ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=True, interval=10)
+# Guardar animación como GIF
+#ani.save("animacion.gif", writer=PillowWriter(fps=10))
+#plt.show()
+
+# Guardar la animación como un video MP4
+output_file = "trayectoria_robots.mp4"
+writer = animation.FFMpegWriter(fps=30, bitrate=1800)
+ani.save(output_file, writer=writer)
+
+print(f"Animación guardada como {output_file}")
+
+
+ax.set_title('Trayectoria de los agentes. Solucion numérica')
+
+
+
+fig, ax = plt.subplots()
+ax = fig.add_subplot(111)
+valores = np.linspace(-4,4,100)
+[x,y]=fun(valores)
+ax.plot(x,y,color="royalblue",linewidth = 2.5,zorder = 2)
+ax.set_xlim(-25, 25)
+ax.set_ylim(-25, 25)
+
+n_frames = len(sol3.t)-2
+# Línea y punto que se animarán
+line1, = ax.plot([], [], 'r-', label='Trayectoria1')
+point1, = ax.plot([], [], 'ro', label='Posición actual1')
+line2, = ax.plot([], [], 'm-', label='Trayectoria2')
+point2, = ax.plot([], [], 'mo', label='Posición actual2')
+line3, = ax.plot([], [],'g-', label='Trayectoria3')
+point3, = ax.plot([], [], 'go', label='Posición actual3')
+
+#ax.legend(loc='upper right')
+
+def init():
+    line1.set_data([], [])
+    point1.set_data([], [])
+    line2.set_data([], [])
+    point2.set_data([], [])
+    line3.set_data([], [])
+    point3.set_data([], [])
+    
+  
+    return line1,line2,line3,point1,point2,point3
+
+def update(frame):
+    line1.set_data(sol3.y[0,:frame+1], sol3.y[1,:frame+1])
+    point1.set_data(sol3.y[0,frame], sol3.y[1,frame])
+    line2.set_data(sol3.y[3,:frame+1], sol3.y[4,:frame+1])
+    point2.set_data(sol3.y[3,frame], sol3.y[4,frame])
+    line3.set_data(sol3.y[6,:frame+1], sol3.y[7,:frame+1])
+    point3.set_data(sol3.y[6,frame], sol3.y[7,frame])
+    
+    return line1, point1,line2,point2,line3,point3
+
+ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=True, interval=10)
+# Guardar animación como GIF
+#ani.save("animacion.gif", writer=PillowWriter(fps=10))
+#plt.show()
+
+# Guardar la animación como un video MP4
+output_file = "trayectoria_robots_Num.mp4"
+writer = animation.FFMpegWriter(fps=30, bitrate=1800)
+ani.save(output_file, writer=writer)
+
+print(f"Animación guardada como {output_file}")
+
+
+
+
+fig, ax = plt.subplots()
+ax = fig.add_subplot(111)
+valores = np.linspace(-4,4,100)
+ax.plot(x,y,color="royalblue",linewidth = 2.5,zorder = 2)
+ax.set_xlim(-25, 25)
+ax.set_ylim(-25, 25)
+n_frames = len(sol3.t)-2
+ax.set_title('Trayectoria de los agentes. Solucion sin CBF')
+# Línea y punto que se animarán
+line1, = ax.plot([], [], 'r-', label='Trayectoria1')
+point1, = ax.plot([], [], 'ro', label='Posición actual1')
+line2, = ax.plot([], [],  'm-', label='Trayectoria2')
+point2, = ax.plot([], [], 'mo', label='Posición actual2')
+line3, = ax.plot([], [], 'g-', label='Trayectoria3')
+point3, = ax.plot([], [], 'go', label='Posición actual3')
+
+#ax.legend(loc='upper right')
+
+def init():
+    line1.set_data([], [])
+    point1.set_data([], [])
+    line2.set_data([], [])
+    point2.set_data([], [])
+    line3.set_data([], [])
+    point3.set_data([], [])
+    
+  
+    return line1,line2,line3,point1,point2,point3
+
+def update(frame):
+    line1.set_data(sol1.y[0,:frame+1], sol1.y[1,:frame+1])
+    point1.set_data(sol1.y[0,frame], sol1.y[1,frame])
+    line2.set_data(sol1.y[3,:frame+1], sol1.y[4,:frame+1])
+    point2.set_data(sol1.y[3,frame], sol1.y[4,frame])
+    line3.set_data(sol1.y[6,:frame+1], sol1.y[7,:frame+1])
+    point3.set_data(sol1.y[6,frame], sol1.y[7,frame])
+    
+    return line1, point1,line2,point2,line3,point3
+
+ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=True, interval=10)
+# Guardar animación como GIF
+#ani.save("animacion.gif", writer=PillowWriter(fps=10))
+#plt.show()
+
+# Guardar la animación como un video MP4
+output_file = "trayectoria_robots_sinCBF.mp4"
+writer = animation.FFMpegWriter(fps=30, bitrate=1800)
+ani.save(output_file, writer=writer)
+
+print(f"Animación guardada como {output_file}")
+
+
 
 
 
