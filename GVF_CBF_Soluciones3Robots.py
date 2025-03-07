@@ -18,6 +18,7 @@ import graph_utils as gu
 from matplotlib.animation import FuncAnimation, PillowWriter
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.linalg import solve
 
 #CASO DE 3 ROBOTS EN UN ESPACIO 2-DIMENSIONAL
 
@@ -123,12 +124,6 @@ def vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
     # Desapilo posiciones
     pi=gu.unstack(xi,n+1)
     Chi_cbf=np.zeros((N,n+1))
-    #Para cada agente
-    #Construyo el problema para optimizar
-    # min 0.5*Chi_hat'*Chi_hat-Xi'*Chi_hat
-    # s.t A*Chi_hat<=b  
-    #Aj=(pj-pi)'P'
-    #bj=alpha*eta3/4
     #Construyo las matrices
     M=np.eye(n+1,n+1)
     Pr=np.zeros((n+1,n+1))
@@ -148,6 +143,7 @@ def vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
                 [[-dx[0,1], -dx[2,1]],[-dy[0,1],-dy[2,1]]],
                 [[-dx[0,2], -dx[1,2]],[-dy[0,2],-dy[1,2]]]])
     M=np.zeros((2*n,2*n))
+    Mm=np.zeros((2*n,2*n))
     agente=0
     Aj=np.zeros((1,N-1))
    
@@ -161,11 +157,10 @@ def vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
            Aj[0,1]=dy[i,vecinos[i,j]]
            c1=Aj@Chi_ap[agente:agente+2]
            c2=alpha*eta[i,vecinos[i,j]]**3/4
-           #print(c1[0],c2)
+           
            if c1[0]<=c2:
                condicion[i]=condicion[i]+1
-           #else:
-           #    print("No se cumple")
+          
         if condicion[i]==2:
             Chi_cbf[i,0:3]=Chi_ap[agente:agente+3]
             #print("Chi_pf. Agente ",i)
@@ -180,24 +175,29 @@ def vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
             M[2:4,2:4]=-P_inv@Pt_inv
             k=i+1
             k2=k+1
+            Mm[0:2,0:2]=np.eye(2)
+            Mm[0:2,2:4]=Pi
+            Mm[2:4,0:2]=Pi.T
             if k==3:
                 k=0
                 k2=1
             elif k==2:
                 k=0
                 k2=2
-            if (eta[i,k]<=0) or (eta[i,k2]<=0):
-                b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
-                S=M@b
-                Chi_cbf[i,0:2]=S[0:2]
-                dum=Chi_ap[agente+2]
-                Chi_cbf[i,2]=dum
-
-            else: 
+            #if (eta[i,k]<=0) or (eta[i,k2]<=0):
+            b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
+            #S=M@b
+            #Resuelvo el sistema
+            S=solve(Mm,b)
+            Chi_cbf[i,0:2]=S[0:2]
+            dum=Chi_ap[agente+2]
+            Chi_cbf[i,2]=dum
+            '''  
+             else: 
                 Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
                 dum=Chi_ap[agente+2]
                 Chi_cbf[i,2]=dum
-
+                '''
             agente=agente+3
         #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
        
@@ -260,8 +260,8 @@ def vector_field_CBF_num(t,xi,Chi_ap,n,N,R,alpha,vecinos):
    
  
 def vector_field_completo(t,xi,k,n,N,ww,kc,L):
-    alpha=50
-    R=2
+    alpha=20   
+    R=5
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
     vecinos=np.array([[1,2],[0,2],[0,1]])
@@ -271,8 +271,8 @@ def vector_field_completo(t,xi,k,n,N,ww,kc,L):
     return xi_eta[0]
   
 def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
-    alpha=50
-    R=2
+    alpha=0.1
+    R=5
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
     vecinos=np.array([[1,2],[0,2],[0,1]])
@@ -330,8 +330,8 @@ Xi = Xi.reshape((N*(n+1),-1)).T #apilamos en un vector
 
 
 sol2 = solve_ivp(vector_field_completo,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
-sol1 = solve_ivp(vector_field,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
-sol3 = solve_ivp(vector_field_completoNum,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
+#sol1 = solve_ivp(vector_field,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
+#sol3 = solve_ivp(vector_field_completoNum,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
 
 lista = np.arange(0,(n+1)*N+1,(n+1))
 '''
@@ -663,7 +663,7 @@ ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
 
-
+'''
 ax.set_title('Trayectoria de los agentes. Solucion numérica')
 
 
@@ -774,7 +774,7 @@ ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
 
-
+'''
 
 
 
