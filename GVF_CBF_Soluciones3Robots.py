@@ -209,6 +209,93 @@ def vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
     #print("Chi_cbf",Chi_cbf_ap)
     #print("Chi_pf",Chi_ap)
     return Chi_cbf_ap
+#TODO: Revisar porque se van todos los campos a cero
+
+def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
+    #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
+    #eta: campo guiado para todos los agentes
+    #k: ganancias positivas
+    #n: dimensiones 
+    #N: nº de agentes 
+    #R: distancia de seguridad entre los robots
+    #alpha: ganancia de la barrera
+    #vecinos: matriz con los indices de los vecinos de cada robot
+    # Desapilo el campo (cuidado que lleva la coordenada ampliada)
+    Chi_ap=vector_field(t,xi,k,n,N,ww,kc,L)
+    Chi=gu.unstack(Chi_ap,n+1)
+    # Desapilo posiciones
+    pi=gu.unstack(xi,n+1)
+    Chi_cbf=np.zeros((N,n+1))
+    #Construyo las matrices
+    M=np.eye(n+1,n+1)
+    Pr=np.zeros((n+1,n+1))
+    Pr[-1,-1]=1
+    Pp=M-Pr
+    eta=np.zeros((N,N))
+    dx=np.zeros((N,N)) 
+    dy=np.zeros((N,N)) 
+    #P=np.zeros((N,N-1,N-1)) 
+    for i in range(N):
+        nvecinos=len(vecinos[i,:])
+        #nv=0
+        for j in range(nvecinos):
+            eta[i,vecinos[i,j]]=np.linalg.norm(Pp@(pi[i,:]-pi[vecinos[i,j],:]))**2-R**2
+            dx[i,vecinos[i,j]]=pi[i,0]-pi[vecinos[i,j],0]
+            dy[i,vecinos[i,j]]=pi[i,1]-pi[vecinos[i,j],1]
+            #P[i,0,nv]=-dx[i,vecinos[i,j]]
+            #P[i,1,nv]=-dy[i,vecinos[i,j]]
+            #nv=nv+1
+    P=np.zeros((N,N-1,N-1)) 
+    P=np.array([[[-dx[1,0], -dx[2,0]],[-dy[1,0],-dy[2,0]]],
+                [[-dx[0,1], -dx[2,1]],[-dy[0,1],-dy[2,1]]],
+                [[-dx[0,2], -dx[1,2]],[-dy[0,2],-dy[1,2]]]])
+    M=np.zeros((2*n,2*n))
+    Mm=np.zeros((2*n,2*n))
+    agente=0
+    tol=0.01
+    for i in range(N):
+        Pi=P[i,:,:]
+        #Veo si el campo de seguimiento verifica la condición
+        Pt=Pi.T
+        if np.linalg.cond(Pt)>1000 or np.linalg.cond(Pi)>1000:
+            Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
+            continue
+        Pt_inv=np.linalg.inv(Pt)
+        P_inv=np.linalg.inv(Pi)
+        M[0:2,2:4]=Pt_inv
+        M[2:4,0:2]=P_inv
+        M[2:4,2:4]=-P_inv@Pt_inv
+        k=i+1
+        k2=k+1
+        Mm[0:2,0:2]=np.eye(2)
+        Mm[0:2,2:4]=Pi
+        Mm[2:4,0:2]=Pi.T
+        if k==3:
+            k=0
+            k2=1
+        elif k==2:
+            k=0
+            k2=2
+        #if (eta[i,k]<=0) or (eta[i,k2]<=0):
+        b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
+        #S=M@b
+        #Resuelvo el sistema
+        S=solve(Mm,b)
+        
+        Chi_cbf[i,0:2]=S[0:2]
+        #if S[2]<tol or S[3]<tol:
+         #   Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
+        
+        dum=Chi_ap[agente+2]
+        Chi_cbf[i,2]=dum
+        print(i,Chi_cbf[i,0:3],Chi_ap[agente:agente+3])
+        agente=agente+3
+        #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
+    
+    Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
+    #print("Chi_cbf",Chi_cbf_ap)
+    #print("Chi_pf",Chi_ap)
+    return Chi_cbf_ap
 
 # CBF solucion numerica
 def vector_field_CBF_num(t,xi,Chi_ap,n,N,R,alpha,vecinos):
@@ -260,19 +347,20 @@ def vector_field_CBF_num(t,xi,Chi_ap,n,N,R,alpha,vecinos):
    
  
 def vector_field_completo(t,xi,k,n,N,ww,kc,L):
-    alpha=20   
-    R=5
+    alpha=0.1
+    R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
     vecinos=np.array([[1,2],[0,2],[0,1]])
     #Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
-    Chi_hat=vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
+    #Chi_hat=vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
+    Chi_hat=vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
   
 def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
     alpha=0.1
-    R=5
+    R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
     vecinos=np.array([[1,2],[0,2],[0,1]])
@@ -280,6 +368,7 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
     Chi_hat=vector_field_CBF_num(t,xi,Chi,n,N,R,alpha,vecinos)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
+
 #------------------------------------------------------------------------
 
 #Parámetro de simulación 
@@ -292,7 +381,7 @@ ki =[1,1] #ganancias
                            #columnas: nº de robots
 
 pos=np.array([[-15.0,0],[-10,-0],[10,10]])
-
+#pos=np.array([[-15.0,0],[-10,-10],[10,10]])
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
 
@@ -318,7 +407,7 @@ for i in range(N):
 
 #resolvemos las ecuación diferencial 
 t = np.linspace(0,5,100) #tiempo de integración 
-tspan=[0,10]
+tspan=[0,5]
 h=t[1]-t[0]
 nf=len(t)
 #añadimos a la matriz de posiciones la coordenada virtual w 
@@ -330,8 +419,32 @@ Xi = Xi.reshape((N*(n+1),-1)).T #apilamos en un vector
 
 
 sol2 = solve_ivp(vector_field_completo,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
-#sol1 = solve_ivp(vector_field,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
-#sol3 = solve_ivp(vector_field_completoNum,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
+sol1 = solve_ivp(vector_field,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
+sol3 = solve_ivp(vector_field_completoNum,tspan,Xi[0],args=(ki,n,N,ww,kc,L))
+
+
+plt.figure()
+plt.title("Solución analítica")
+plt.plot(sol2.y[0,:],sol2.y[1,:],'r-',label='A1')
+plt.plot(sol2.y[3,:],sol2.y[4,:],'b-',label='A2')
+plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
+
+plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
+plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
+plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
+
+
+plt.figure()
+plt.title("Solución numérica")
+plt.plot(sol3.y[0,:],sol3.y[1,:],'r-',label='A1')
+plt.plot(sol3.y[3,:],sol3.y[4,:],'b-',label='A2')
+plt.plot(sol3.y[6,:],sol3.y[7,:],'g-',label='A3')
+
+plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
+plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
+plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
+
+
 
 lista = np.arange(0,(n+1)*N+1,(n+1))
 '''
@@ -610,7 +723,7 @@ ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
 '''
-
+'''
 #2D
 fig, ax = plt.subplots()
 ax = fig.add_subplot(111)
@@ -662,7 +775,7 @@ writer = animation.FFMpegWriter(fps=30, bitrate=1800)
 ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
-
+'''
 '''
 ax.set_title('Trayectoria de los agentes. Solucion numérica')
 
