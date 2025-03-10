@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Wed Feb  5 12:08:19 2025
@@ -227,44 +227,52 @@ def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
     pi=gu.unstack(xi,n+1)
     Chi_cbf=np.zeros((N,n+1))
     #Construyo las matrices
+    #Construyo las matrices
     M=np.eye(n+1,n+1)
     Pr=np.zeros((n+1,n+1))
     Pr[-1,-1]=1
-    Pp=M-Pr
+    P=M-Pr
     eta=np.zeros((N,N))
-    dx=np.zeros((N,N)) 
-    dy=np.zeros((N,N)) 
-    #P=np.zeros((N,N-1,N-1)) 
     for i in range(N):
-        nvecinos=len(vecinos[i,:])
-        #nv=0
-        for j in range(nvecinos):
-            eta[i,vecinos[i,j]]=np.linalg.norm(Pp@(pi[i,:]-pi[vecinos[i,j],:]))**2-R**2
-            dx[i,vecinos[i,j]]=-pi[i,0]+pi[vecinos[i,j],0]
-            dy[i,vecinos[i,j]]=-pi[i,1]+pi[vecinos[i,j],1]
-            #P[i,0,nv]=-dx[i,vecinos[i,j]]
-            #P[i,1,nv]=-dy[i,vecinos[i,j]]
-            #nv=nv+1
-    #Agente 1
-    d=np.linalg.norm(Pp@(pi[0,:]-pi[1,:]))**2
-    dx=-pi[0,0]+pi[1,0]
-    dy=-pi[0,1]+pi[1,1]
-    lam=(alpha/4)*(d-R**2)**3/d+dx/d*Chi_ap[0]+dy/d*Chi_ap[1]
-    Chi_cbf[0,0]=Chi_ap[0]-lam*dx
-    Chi_cbf[0,1]=Chi_ap[1]-lam*dy
-    Chi_cbf[0,2]=Chi_ap[2]
-    agente=0
-    print("0",Chi_cbf[0,0:3],Chi_ap[agente:agente+3])
-    #Agente 2
-    d=np.linalg.norm(Pp@(pi[1,:]-pi[0,:]))**2
-    dx=-dx
-    dy=-dy
-    lam=(alpha/4)*(d-R**2)**3/d+dx/d*Chi_ap[0]+dy/d*Chi_ap[1]
-    Chi_cbf[1,0]=Chi_ap[3]-lam*dx
-    Chi_cbf[1,1]=Chi_ap[4]-lam*dy
-    Chi_cbf[1,2]=Chi_ap[5]
-    agente=3
-    print("0",Chi_cbf[1,0:3],Chi_ap[agente:agente+3])
+        for j in range(N):
+            eta[i,j]=np.linalg.norm(P@(pi[i,:]-pi[j,:]))**2-R**2
+    #TODO: Revisar el calculo de A y b
+    for i in range(N):
+        A=np.zeros((N-1,n+1))
+        b=np.zeros(N-1)
+        s=0
+        for k in range(N-1):
+            if k==i:
+                continue
+            A[s,:]=(pi[k]-pi[i])@P.T
+            b[s]=alpha*eta[i,k]**3/4.0
+            s+=1
+        #[1] Veo si el óptimo global verifica las restricciones
+        m=A@Chi[i,:]
+        if(m[0]<=b[0] and m[1]<=b[1]):
+            Chi_cbf[i,:]=Chi[i,:]
+        else:
+            npi=0
+        #Veo que restricciones están activas
+            if m[0]>b[0]:
+                if m[1]>b[1]:
+                    #Ambas
+                    Aa=A.copy()
+                    ba=b.copy()
+                    npi=2
+                else:
+                    Aa=A[0,:]
+                    ba=b[0]
+            else:
+                Aa=A[1,:]
+                ba=b[1]
+            Aai=(Aa@Aa.T)**-1
+            if(npi==2):
+                lA=Aai@(Aa@Chi[i,:]-ba)
+            else:
+                lA=Aai*(Aa@Chi[i,:]-ba)
+            Chi_cbf[i,:]=Chi[i,:]-Aa.T*lA
+            print(i,Chi_cbf[i,:])
     Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
     #print("Chi_cbf",Chi_cbf_ap)
     #print("Chi_pf",Chi_ap)
@@ -346,14 +354,14 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
 
 #Parámetro de simulación 
 n = 2           #dimensiones del espacio
-N =2          #nº de agentes 
+N =3          #nº de agentes 
 ki =[1,1] #ganancias 
 
 #coordenadas iniciales de los robots 
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-15.0,0],[-10,-0]])
+pos=np.array([[-15.0,0],[-14,0],[10,2]])
 #pos=np.array([[-15.0,0],[-10,-10],[10,10]])
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -400,22 +408,22 @@ plt.figure()
 plt.title("Solución analítica")
 plt.plot(sol2.y[0,:],sol2.y[1,:],'r-',label='A1')
 plt.plot(sol2.y[3,:],sol2.y[4,:],'b-',label='A2')
-#plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
+plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
 
 plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
 plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
-#plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
+plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
 
 
 plt.figure()
 plt.title("Solución numérica")
 plt.plot(sol3.y[0,:],sol3.y[1,:],'r-',label='A1')
 plt.plot(sol3.y[3,:],sol3.y[4,:],'b-',label='A2')
-#plt.plot(sol3.y[6,:],sol3.y[7,:],'g-',label='A3')
+plt.plot(sol3.y[6,:],sol3.y[7,:],'g-',label='A3')
 
 plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
 plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
-#plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
+plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
 
 
 
@@ -696,7 +704,7 @@ ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
 '''
-'''
+
 #2D
 fig, ax = plt.subplots()
 ax = fig.add_subplot(111)
@@ -748,7 +756,7 @@ writer = animation.FFMpegWriter(fps=30, bitrate=1800)
 ani.save(output_file, writer=writer)
 
 print(f"Animación guardada como {output_file}")
-'''
+
 '''
 ax.set_title('Trayectoria de los agentes. Solucion numérica')
 

@@ -255,9 +255,9 @@ def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
     tol=0.01
     for i in range(N):
         Pi=P[i,:,:]
-        #Veo si el campo de seguimiento verifica la condición
         Pt=Pi.T
-        if np.linalg.cond(Pt)>1000 or np.linalg.cond(Pi)>1000:
+        for j in range(2):
+            
             Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
             continue
         Pt_inv=np.linalg.inv(Pt)
