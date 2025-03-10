@@ -245,54 +245,26 @@ def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
             #P[i,0,nv]=-dx[i,vecinos[i,j]]
             #P[i,1,nv]=-dy[i,vecinos[i,j]]
             #nv=nv+1
-    P=np.zeros((N,N-1,N-1)) 
-    P=np.array([[[-dx[1,0], -dx[2,0]],[-dy[1,0],-dy[2,0]]],
-                [[-dx[0,1], -dx[2,1]],[-dy[0,1],-dy[2,1]]],
-                [[-dx[0,2], -dx[1,2]],[-dy[0,2],-dy[1,2]]]])
-    M=np.zeros((2*n,2*n))
-    Mm=np.zeros((2*n,2*n))
+    #Agente 1
+    d=np.linalg.norm(Pp@(pi[0,:]-pi[1,:]))**2
+    dx=-pi[0,0]+pi[1,0]
+    dy=-pi[0,1]+pi[1,1]
+    lam=(alpha/4)*(d-R**2)**3/d+dx/d*Chi_ap[0]+dy/d*Chi_ap[1]
+    Chi_cbf[0,0]=Chi_ap[0]-lam*dx
+    Chi_cbf[0,1]=Chi_ap[1]-lam*dy
+    Chi_cbf[0,2]=Chi_ap[2]
     agente=0
-    tol=0.01
-    for i in range(N):
-        Pi=P[i,:,:]
-        #Veo si el campo de seguimiento verifica la condición
-        Pt=Pi.T
-        if np.linalg.cond(Pt)>1000 or np.linalg.cond(Pi)>1000:
-            Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
-            continue
-        Pt_inv=np.linalg.inv(Pt)
-        P_inv=np.linalg.inv(Pi)
-        M[0:2,2:4]=Pt_inv
-        M[2:4,0:2]=P_inv
-        M[2:4,2:4]=-P_inv@Pt_inv
-        k=i+1
-        k2=k+1
-        Mm[0:2,0:2]=np.eye(2)
-        Mm[0:2,2:4]=Pi
-        Mm[2:4,0:2]=Pi.T
-        if k==3:
-            k=0
-            k2=1
-        elif k==2:
-            k=0
-            k2=2
-        #if (eta[i,k]<=0) or (eta[i,k2]<=0):
-        b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
-        #S=M@b
-        #Resuelvo el sistema
-        print(M)
-        S=solve(Mm,b)
-        
-        Chi_cbf[i,0:2]=S[0:2]
-        #if S[2]<tol or S[3]<tol:
-         #   Chi_cbf[i,0:2]=Chi_ap[agente:agente+2]
-        
-        dum=Chi_ap[agente+2]
-        Chi_cbf[i,2]=dum
-        print(i,Chi_cbf[i,0:3],Chi_ap[agente:agente+3])
-        agente=agente+3
-        #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
-    
+    print("0",Chi_cbf[0,0:3],Chi_ap[agente:agente+3])
+    #Agente 2
+    d=np.linalg.norm(Pp@(pi[1,:]-pi[0,:]))**2
+    dx=-dx
+    dy=-dy
+    lam=(alpha/4)*(d-R**2)**3/d+dx/d*Chi_ap[0]+dy/d*Chi_ap[1]
+    Chi_cbf[1,0]=Chi_ap[3]-lam*dx
+    Chi_cbf[1,1]=Chi_ap[4]-lam*dy
+    Chi_cbf[1,2]=Chi_ap[5]
+    agente=3
+    print("0",Chi_cbf[1,0:3],Chi_ap[agente:agente+3])
     Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
     #print("Chi_cbf",Chi_cbf_ap)
     #print("Chi_pf",Chi_ap)
@@ -352,7 +324,7 @@ def vector_field_completo(t,xi,k,n,N,ww,kc,L):
     R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
-    vecinos=np.array([[1,2],[0,2],[0,1]])
+    vecinos=np.array([[1],[0]])
     #Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
     #Chi_hat=vector_field_CBF_new(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
     Chi_hat=vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
@@ -364,7 +336,7 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
     R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
-    vecinos=np.array([[1,2],[0,2],[0,1]])
+    vecinos=np.array([[1],[0]])
     Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
     Chi_hat=vector_field_CBF_num(t,xi,Chi,n,N,R,alpha,vecinos)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
@@ -374,14 +346,14 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
 
 #Parámetro de simulación 
 n = 2           #dimensiones del espacio
-N =3          #nº de agentes 
+N =2          #nº de agentes 
 ki =[1,1] #ganancias 
 
 #coordenadas iniciales de los robots 
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-15.0,0],[-10,-0],[10,10]])
+pos=np.array([[-15.0,0],[-10,-0]])
 #pos=np.array([[-15.0,0],[-10,-10],[10,10]])
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -428,22 +400,22 @@ plt.figure()
 plt.title("Solución analítica")
 plt.plot(sol2.y[0,:],sol2.y[1,:],'r-',label='A1')
 plt.plot(sol2.y[3,:],sol2.y[4,:],'b-',label='A2')
-plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
+#plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
 
 plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
 plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
-plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
+#plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
 
 
 plt.figure()
 plt.title("Solución numérica")
 plt.plot(sol3.y[0,:],sol3.y[1,:],'r-',label='A1')
 plt.plot(sol3.y[3,:],sol3.y[4,:],'b-',label='A2')
-plt.plot(sol3.y[6,:],sol3.y[7,:],'g-',label='A3')
+#plt.plot(sol3.y[6,:],sol3.y[7,:],'g-',label='A3')
 
 plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
 plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
-plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
+#plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
 
 
 
