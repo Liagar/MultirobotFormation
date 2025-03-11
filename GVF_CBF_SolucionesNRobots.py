@@ -15,12 +15,10 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import qp as qp
 import graph_utils as gu
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FuncAnimation
 import matplotlib.animation as animation
-from mpl_toolkits.mplot3d import Axes3D
-from scipy.linalg import solve
 
-#CASO DE 3 ROBOTS EN UN ESPACIO 2-DIMENSIONAL
+#CASO DE N ROBOTS EN UN ESPACIO 2-DIMENSIONAL
 
 #todos los agentes siguen las mismas ecuaciones de trayectoria
 
@@ -107,7 +105,7 @@ def vector_field(t,xi,k,n,N,ww,kc,L):
 
     return xi_eta[0]
 
-   
+  
 #Solucion analítica del problema
 
 def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
@@ -141,40 +139,26 @@ def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
         A=np.zeros((N-1,n+1))
         b=np.zeros(N-1)
         s=0
-        for k in range(N-1):
-            if k==i:
-                continue
-            A[s,:]=(pi[k]-pi[i])@P.T
-            b[s]=alpha*eta[i,k]**3/4.0
+        nvecinos=len(vecinos[i,:])
+        for k in range(nvecinos):
+            v=vecinos[i,k]
+            A[s,:]=(pi[v]-pi[i])@P.T
+            b[s]=alpha*eta[i,v]**3/4.0
             s+=1
         #[1] Veo si el óptimo global verifica las restricciones
         m=A@Chi[i,:]
-        if(m[0]<=b[0] and m[1]<=b[1]):
-            Chi_cbf[i,:]=Chi[i,:]
-        else:
-            npi=0
-        #[2] Veo que restricciones están activas
-        #TODO Generalizarlo para un número m de vecinos
-            if m[0]>b[0]:
-                if m[1]>b[1]:
-                    #Ambas
-                    Aa=A.copy()
-                    ba=b.copy()
-                    npi=2
-                else:
-                    Aa=A[0,:]
-                    ba=b[0]
-            else:
-                Aa=A[1,:]
-                ba=b[1]
-            Aai=(Aa@Aa.T)**-1
-            if(npi==2):
-                lA=Aai@(Aa@Chi[i,:]-ba)
-                Chi_cbf[i,:]=Chi[i,:]-Aa.T@lA
-            else:
-                lA=Aai*(Aa@Chi[i,:]-ba)
-                Chi_cbf[i,:]=Chi[i,:]-Aa.T*lA
-            print(i,Chi_cbf[i,:])
+        Aa = np.empty([0,3])
+        ba = np.empty([0])
+        for j in range(nvecinos):
+            if m[j]>b[j]:
+                bb=[b[j]]
+                aa=[A[j]]
+                Aa=np.append(Aa,aa,axis=0)
+                ba=np.append(ba,bb)
+        Aai=(Aa@Aa.T)**-1
+        lA=Aai@(Aa@Chi[i,:]-ba)
+        Chi_cbf[i,:]=Chi[i,:]-Aa.T@lA
+        print(i,Chi_cbf[i,:])
     Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
     #print("Chi_cbf",Chi_cbf_ap)
     #print("Chi_pf",Chi_ap)
@@ -234,7 +218,7 @@ def vector_field_completo(t,xi,k,n,N,ww,kc,L):
     R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
-    vecinos=np.array([[1],[0]])
+    vecinos=np.array([[1,2,3,4],[0,2,3,4],[0,1,3,4],[0,1,2,4],[0,1,2,3]])
     Chi_hat=vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
@@ -243,7 +227,7 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
     alpha=0.1
     R=2
     vecinos=np.zeros((N,N-1))
-    vecinos=np.array([[1],[0]])
+    vecinos=np.array([[1,2,3,4],[0,2,3,4],[0,1,3,4],[0,1,2,4],[0,1,2,3]])
     Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
     Chi_hat=vector_field_CBF_num(t,xi,Chi,n,N,R,alpha,vecinos)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
@@ -253,14 +237,14 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
 
 #Parámetro de simulación 
 n = 2           #dimensiones del espacio
-N =3          #nº de agentes 
+N =5          #nº de agentes 
 ki =[1,1] #ganancias 
 
 #coordenadas iniciales de los robots 
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-15.0,0],[-14,0],[-15.5,1]])
+pos=np.array([[-15.0,0],[-14,0],[-15.5,1],[-5,0],[5,0]])
 #pos=np.array([[-15.0,0],[-10,-10],[10,10]])
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
@@ -308,11 +292,14 @@ plt.title("Solución analítica")
 plt.plot(sol2.y[0,:],sol2.y[1,:],'r-',label='A1')
 plt.plot(sol2.y[3,:],sol2.y[4,:],'b-',label='A2')
 plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
+plt.plot(sol2.y[9,:],sol2.y[10,:],'y-',label='A4')
+plt.plot(sol2.y[12,:],sol2.y[13,:],'m-',label='A5')
 
 plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
 plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
 plt.plot(sol1.y[6,:],sol1.y[7,:],'k--',label='A3 sin CBF')
-
+plt.plot(sol1.y[9,:],sol1.y[10,:],'k--',label='A4 sin CBF')
+plt.plot(sol1.y[12,:],sol1.y[13,:],'k--',label='A5 sin CBF')
 
 plt.figure()
 plt.title("Solución numérica")
@@ -620,6 +607,10 @@ line2, = ax.plot([], [], 'm-', label='Trayectoria2')
 point2, = ax.plot([], [], 'mo', label='Posición actual2')
 line3, = ax.plot([], [], 'g-', label='Trayectoria3')
 point3, = ax.plot([], [], 'go', label='Posición actual3')
+line4, = ax.plot([], [], 'b-', label='Trayectoria4')
+point4, = ax.plot([], [], 'bo', label='Posición actual4')
+line5, = ax.plot([], [], 'k-', label='Trayectoria5')
+point5, = ax.plot([], [], 'ko', label='Posición actual5')
 
 ax.set_title("Solucion analítica")
 #ax.legend(loc='upper right')
@@ -631,6 +622,10 @@ def init():
     point2.set_data([], [])
     line3.set_data([], [])
     point3.set_data([], [])
+    line4.set_data([], [])
+    point4.set_data([], [])
+    line5.set_data([], [])
+    point5.set_data([], [])
     
   
     return line1,line2,line3,point1,point2,point3
@@ -642,7 +637,11 @@ def update(frame):
     point2.set_data(sol2.y[3,frame], sol2.y[4,frame])
     line3.set_data(sol2.y[6,:frame+1], sol2.y[7,:frame+1])
     point3.set_data(sol2.y[6,frame], sol2.y[7,frame])
-    return line1, point1,line2,point2,line3,point3
+    line4.set_data(sol2.y[9,:frame+1], sol2.y[10,:frame+1])
+    point4.set_data(sol2.y[9,frame], sol2.y[10,frame])
+    line4.set_data(sol2.y[12,:frame+1], sol2.y[13,:frame+1])
+    point4.set_data(sol2.y[12,frame], sol2.y[13,frame])
+    return line1, point1,line2,point2,line3,point3,line4,point4,line5,point5
 
 ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=True, interval=10)
 # Guardar animación como GIF
