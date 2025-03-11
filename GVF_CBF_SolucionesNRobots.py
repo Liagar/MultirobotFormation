@@ -639,8 +639,8 @@ def update(frame):
     point3.set_data(sol2.y[6,frame], sol2.y[7,frame])
     line4.set_data(sol2.y[9,:frame+1], sol2.y[10,:frame+1])
     point4.set_data(sol2.y[9,frame], sol2.y[10,frame])
-    line4.set_data(sol2.y[12,:frame+1], sol2.y[13,:frame+1])
-    point4.set_data(sol2.y[12,frame], sol2.y[13,frame])
+    line5.set_data(sol2.y[12,:frame+1], sol2.y[13,:frame+1])
+    point5.set_data(sol2.y[12,frame], sol2.y[13,frame])
     return line1, point1,line2,point2,line3,point3,line4,point4,line5,point5
 
 ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=True, interval=10)
