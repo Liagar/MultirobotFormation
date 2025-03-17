@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt 
+from ldl import
 
 def phi1(x,w):
     f1 = x - 15*np.sin(2*w)

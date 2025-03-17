@@ -17,7 +17,7 @@ import qp as qp
 import graph_utils as gu
 from matplotlib.animation import FuncAnimation
 import matplotlib.animation as animation
-
+from ldl import inverse_using_ldlt, ldlt_decomposition
 #CASO DE N ROBOTS EN UN ESPACIO 2-DIMENSIONAL
 
 #todos los agentes siguen las mismas ecuaciones de trayectoria
@@ -155,7 +155,9 @@ def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
                 aa=[A[j]]
                 Aa=np.append(Aa,aa,axis=0)
                 ba=np.append(ba,bb)
-        Aai=(Aa@Aa.T)**-1
+        #Aai=(Aa@Aa.T)**-1
+        L,D=ldlt_decomposition(Aa@Aa.T)
+        Aai=inverse_using_ldlt(L,D)
         lA=Aai@(Aa@Chi[i,:]-ba)
         Chi_cbf[i,:]=Chi[i,:]-Aa.T@lA
         print(i,Chi_cbf[i,:])
