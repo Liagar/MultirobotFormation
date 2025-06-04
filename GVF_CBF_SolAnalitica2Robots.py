@@ -141,8 +141,17 @@ def vector_field_CBF(xi,Chi_ap,n,N,R,alpha):
     dx=pi[0,0]-pi[1,0]
     dy=pi[0,1]-pi[1,1]
     d2=(dx)**2+(dy)**2
-    lam=(-alpha*eta[0,1]**3+(dx)*Chi[0,0]+dy*Chi[0,1])/(4*d2)
-    lam2=(-alpha*eta[1,0]**3-(dx)*Chi[1,0]-dy*Chi[1,1])/(4*d2)
+    lam=0
+    lam2=0
+    if(d2<R**2):
+        if (-alpha*eta[0,1]**3+(dx)*Chi[0,0]+dy*Chi[0,1])>0:
+            lam=(-alpha*eta[0,1]**3+(dx)*Chi[0,0]+dy*Chi[0,1])/(4*d2)
+        else:
+            lam=0
+        if ((-alpha*eta[1,0]**3-(dx)*Chi[1,0]-dy*Chi[1,1])>0):
+            lam2=(-alpha*eta[1,0]**3-(dx)*Chi[1,0]-dy*Chi[1,1])/(4*d2)
+        else: 
+            lam2=0
 
     Chi_cbf[0,0]=Chi[0,0]+lam*dx
     Chi_cbf[0,1]=Chi[0,1]+lam*dy
@@ -174,7 +183,7 @@ ki =[1,1] #ganancias
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-10.0,-10],[10.,10]])
+pos=np.array([[-10.0,-10],[-11.,-12]])
 
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
