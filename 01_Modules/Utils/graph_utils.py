@@ -52,3 +52,13 @@ def stack(p):
             ps[j,0]=p[i,k]
             j+=1
     return ps
+
+def neighbours(Z,i):
+    n = []
+    num_arcos, _ = np.shape(Z)
+    for j in range(num_arcos):
+        if Z[j,0] == i:
+            n.append(Z[j,1])
+        if Z[j,1] == i:
+            n.append(Z[j,0])
+    return n

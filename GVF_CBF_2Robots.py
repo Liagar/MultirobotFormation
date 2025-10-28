@@ -177,15 +177,15 @@ def vector_field_completo(t,xi,k,n,N,ww,kc,L):
 
 #Parámetro de simulación 
 n = 2           #dimensiones del espacio
-N =2          #nº de agentes 
+N =3          #nº de agentes 
 ki =[1,1] #ganancias 
 
 #coordenadas iniciales de los robots 
 #pos = np.random.rand(N, n)*100 #filas: dimensiones
                            #columnas: nº de robots
 
-pos=np.array([[-15.0,0],[-16,0]])
-#pos=np.array([[-15.0,0],[-10,-10],[10,10]])
+#pos=np.array([[-15.0,0],[-16,0]])
+pos=np.array([[-15.0,0],[-10,-10],[10,10]])
 #añadimos a la matriz de posiciones la coordenada virtual w 
 w = np.ones((N,1)) #ejemplo: todos valen 1 
 
@@ -230,9 +230,11 @@ plt.figure()
 plt.title("Solución analítica")
 plt.plot(sol2.y[0,:],sol2.y[1,:],'r-',label='A1')
 plt.plot(sol2.y[3,:],sol2.y[4,:],'b-',label='A2')
+plt.plot(sol2.y[6,:],sol2.y[7,:],'g-',label='A3')
 
 plt.plot(sol1.y[0,:],sol1.y[1,:],'m--',label='A1 sin CBF')
 plt.plot(sol1.y[3,:],sol1.y[4,:],'c--',label='A2 sin CBF')
+plt.plot(sol1.y[6,:],sol1.y[7,:],'g--',label='A3 sin CBF')
 
 
 
@@ -528,6 +530,8 @@ line1, = ax.plot([], [], 'r-', label='Trayectoria1')
 point1, = ax.plot([], [], 'ro', label='Posición actual1')
 line2, = ax.plot([], [], 'm-', label='Trayectoria2')
 point2, = ax.plot([], [], 'mo', label='Posición actual2')
+line3, = ax.plot([], [], 'g-', label='Trayectoria3')
+point3, = ax.plot([], [], 'go', label='Posición actual3')
 
 ax.set_title("Solucion analítica")
 #ax.legend(loc='upper right')
@@ -537,16 +541,20 @@ def init():
     point1.set_data([], [])
     line2.set_data([], [])
     point2.set_data([], [])
+    line3.set_data([], [])
+    point3.set_data([], [])
     
   
-    return line1,line2,point1,point2
+    return line1,line2,point1,point2,line3,point3
 
 def update(frame):
     line1.set_data(sol2.y[0,:frame+1], sol2.y[1,:frame+1])
     point1.set_data(sol2.y[0,frame], sol2.y[1,frame])
     line2.set_data(sol2.y[3,:frame+1], sol2.y[4,:frame+1])
     point2.set_data(sol2.y[3,frame], sol2.y[4,frame])
-    return line1, point1,line2,point2
+    line3.set_data(sol2.y[6,:frame+1], sol2.y[7,:frame+1])
+    point3.set_data(sol2.y[6,frame], sol2.y[7,frame])
+    return line1, point1,line2,point2,line3,point3
 
 ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=True, interval=10)
 # Guardar animación como GIF

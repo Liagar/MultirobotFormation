@@ -15,8 +15,8 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import qp as qp
 import graph_utils as gu
-from matplotlib.animation import FuncAnimation, PillowWriter
 import matplotlib.animation as animation
+from ldl import inverse_using_ldlt, ldlt_decomposition
    
 #CASO DE 3 ROBOTS EN UN ESPACIO 2-DIMENSIONAL
 
@@ -29,7 +29,7 @@ np.random.seed(123)
 def fun(w):
     f1 = 15*np.sin(2*w)
     f2 = 30*np.sin(w)*(np.sqrt(0.5*(1-0.5*(np.sin(w))**2)))
-    f3 = 3+5*np.cos(2*w)
+    #f3 = 3+5*np.cos(2*w)
     return np.array([f1, f2])
 
 #funciones phi
@@ -108,14 +108,13 @@ def vector_field(t,xi,k,n,N,ww,kc,L):
     #TODO: Revisar y entender bien el problema porque algo se me escapa
 
 def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
-    #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
+   #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
     #eta: campo guiado para todos los agentes
     #k: ganancias positivas
     #n: dimensiones 
     #N: nº de agentes 
     #R: distancia de seguridad entre los robots
     #alpha: ganancia de la barrera
-    #vecinos: matriz con los indices de los vecinos de cada robot
     # Desapilo el campo (cuidado que lleva la coordenada ampliada)
     Chi=gu.unstack(Chi_ap,n+1)
     # Desapilo posiciones
@@ -132,57 +131,35 @@ def vector_field_CBF(t,xi,Chi_ap,n,N,R,alpha,vecinos):
     Pr=np.zeros((n+1,n+1))
     Pr[-1,-1]=1
     P=M-Pr
-    eta=np.zeros((N,N))
-    dx=np.zeros((N,N)) 
-    dy=np.zeros((N,N)) 
+    eta=np.zeros((N+1,N+1))
     for i in range(N):
-        nvecinos=len(vecinos[i,:])
-        for j in range(nvecinos):
-            eta[i,vecinos[i,j]]=np.linalg.norm(P@(pi[i,:]-pi[vecinos[i,j],:]))**2-R**2
-            dx[i,vecinos[i,j]]=pi[i,0]-pi[vecinos[i,j],0]
-            dy[i,vecinos[i,j]]=pi[i,1]-pi[vecinos[i,j],1]
-    P=np.zeros((N,N-1,N-1)) 
-    P=np.array([[[-dx[1,0], -dx[2,0]],[-dy[1,0],-dy[2,0]]],
-                [[-dx[0,1], -dx[2,1]],[-dy[0,1],-dy[2,1]]],
-                [[-dx[0,2], -dx[1,2]],[-dy[0,2],-dy[1,2]]]])
-    M=np.zeros((2*n,2*n))
-    agente=0
-    Aj=np.zeros((1,N-1))
-   
-    condicion=np.zeros(N)
-    for i in range(N):
-        Pi=P[i,:,:]
-        #Veo si el campo de seguimiento verifica la condición
-        #TODO Revisar esto
-     
-        Pt=Pi.T
-        Pt_inv=np.linalg.inv(Pt)
-        P_inv=np.linalg.inv(Pi)
-        M[0:2,2:4]=Pt_inv
-        M[2:4,0:2]=P_inv
-        M[2:4,2:4]=-P_inv@Pt_inv
-        k=i+1
-        k2=k+1
-        if k==3:
-             k=0
-             k2=1
-        elif k==2:
-             k=0
-             k2=2
-        b=np.array([Chi_ap[agente],Chi_ap[agente+1],-alpha*eta[i,k]**3/4,-alpha*eta[i,k2]**3/4])  
-        S=M@b
-        Chi_cbf[i,0:2]=S[0:2]
-        agente=agente+3
-        #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
+        for j in range(N):
+            eta[i,j]=np.linalg.norm(P@(pi[i,:]-pi[j,:]))**2-R**2
+            
+    dx=pi[0,0]-pi[1,0]
+    dy=pi[0,1]-pi[1,1]
+    d2=(dx)**2+(dy)**2
+    lam=0
+    lam2=0
+    if(d2<(R+5)**2):
+        if (-alpha*eta[0,1]**3+(dx)*Chi[0,0]+dy*Chi[0,1])>0:
+            lam=(-alpha*eta[0,1]**3+(dx)*Chi[0,0]+dy*Chi[0,1])/(4*d2)
+        else:
+            lam=0
+        if ((-alpha*eta[1,0]**3-(dx)*Chi[1,0]-dy*Chi[1,1])>0):
+            lam2=(-alpha*eta[1,0]**3-(dx)*Chi[1,0]-dy*Chi[1,1])/(4*d2)
+        else: 
+            lam2=0
 
-    Chi_cbf[:,2]=Chi[:,2]
+    Chi_cbf[0,0]=Chi[0,0]+lam*dx
+    Chi_cbf[0,1]=Chi[0,1]+lam*dy
+    Chi_cbf[0,2]=Chi[0,2]
+    Chi_cbf[1,0]=Chi[1,0]-lam2*dx
+    Chi_cbf[1,1]=Chi[1,1]-lam2*dy
+    Chi_cbf[1,2]=Chi[1,2]
     
- 
-        
-    Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
-    #print("Chi_cbf",Chi_cbf_ap)
-    #print("Chi_pf",Chi_ap)
-    return Chi_cbf_ap
+        #Chi_cbf[i,:]=qp.qp_solve(M,-Chi[i,:],G=A,h=b,A=None,b=None,lb=None,ub=None)
+    return Chi_cbf
 
 # CBF solucion numerica
 def vector_field_CBF_num(t,xi,Chi_ap,n,N,R,alpha,vecinos):
@@ -232,18 +209,76 @@ def vector_field_CBF_num(t,xi,Chi_ap,n,N,R,alpha,vecinos):
     #print("Chi_pf",Chi_ap)
     return Chi_cbf_ap
    
- 
+def vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,k,ww,kc,L):
+    #xi: posiciones de todos los agentes (vector columna con las 4 coordenadas )
+    #eta: campo guiado para todos los agentes
+    #k: ganancias positivas
+    #n: dimensiones 
+    #N: nº de agentes 
+    #R: distancia de seguridad entre los robots
+    #alpha: ganancia de la barrera
+    #vecinos: matriz con los indices de los vecinos de cada robot
+    # Desapilo el campo (cuidado que lleva la coordenada ampliada)
+    Chi_ap=vector_field(t,xi,k,n,N,ww,kc,L)
+    Chi=gu.unstack(Chi_ap,n+1)
+    # Desapilo posiciones
+    pi=gu.unstack(xi,n+1)
+    Chi_cbf=np.zeros((N,n+1))
+    #Construyo las matrices
+    #Construyo las matrices
+    M=np.eye(n+1,n+1)
+    Pr=np.zeros((n+1,n+1))
+    Pr[-1,-1]=1
+    P=M-Pr
+    #Construyo la función de seguridad para la barrera
+    eta=np.zeros((N,N))
+    for i in range(N):
+        for j in range(N):
+            eta[i,j]=np.linalg.norm(P@(pi[i,:]-pi[j,:]))**2-R**2
+    
+    for i in range(N):
+        A=np.zeros((N-1,n+1))
+        b=np.zeros(N-1)
+        s=0
+        nvecinos=len(vecinos[i,:])
+        for k in range(nvecinos):
+            v=vecinos[i,k]
+            A[s,:]=(pi[v]-pi[i])@P.T
+            b[s]=alpha*eta[i,v]**3/4.0
+            s+=1
+        #[1] Veo si el óptimo global verifica las restricciones
+        m=A@Chi[i,:]
+        Aa = np.empty([0,3])
+        ba = np.empty([0])
+        for j in range(nvecinos):
+            if m[j]>b[j]:
+                bb=[b[j]]
+                aa=[A[j]]
+                Aa=np.append(Aa,aa,axis=0)
+                ba=np.append(ba,bb)
+        #Aai=(Aa@Aa.T)**-1
+        L,D=ldlt_decomposition(Aa@Aa.T)
+        Aai=inverse_using_ldlt(L,D)
+        lA=Aai@(Aa@Chi[i,:]-ba)
+        Chi_cbf[i,:]=Chi[i,:]-Aa.T@lA
+        print(i,Chi_cbf[i,:])
+    Chi_cbf_ap=Chi_cbf.reshape((N*(n+1),-1)).T
+    #print("Chi_cbf",Chi_cbf_ap)
+    #print("Chi_pf",Chi_ap)
+    return Chi_cbf_ap
+
+
+
 def vector_field_completo(t,xi,k,n,N,ww,kc,L):
-    alpha=100
+    alpha=0.1
     R=2
     #TODO una lista con los vecinos de cada robot
     vecinos=np.zeros((N,N-1))
-    vecinos=np.array([[1,2],[0,2],[0,1]])
-    Chi=vector_field(t,xi,ki,n,N,ww,kc,L)
-    Chi_hat=vector_field_CBF(t,xi,Chi,n,N,R,alpha,vecinos)
+    vecinos=np.array([[1,2,3,4],[0,2,3,4],[0,1,3,4],[0,1,2,4],[0,1,2,3]])
+    Chi_hat=vector_field_CBF_analitico(t,xi,n,N,R,alpha,vecinos,ki,ww,kc,L)
     xi_eta = Chi_hat.reshape((N*(n+1),-1)).T
     return xi_eta[0]
-  
+ 
 def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
     alpha=50
     R=2
@@ -258,7 +293,7 @@ def vector_field_completoNum(t,xi,k,n,N,ww,kc,L):
 
 #Parámetro de simulación 
 n = 2           #dimensiones del espacio
-N =3          #nº de agentes 
+N =5          #nº de agentes 
 ki =[1,1] #ganancias 
 
 #coordenadas iniciales de los robots 
