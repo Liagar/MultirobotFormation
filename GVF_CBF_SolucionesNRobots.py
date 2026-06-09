@@ -32,6 +32,13 @@ def fun(w):
     f3 = 3+5*np.cos(2*w)
     return np.array([f1, f2])
 
+def barrera(R,p):
+    x=np.linspace(p[0]-R, p[0]+R,20)
+    ymas=p[1]+np.sqrt(R**2-(x-p[0])**2)
+    ymenos=p[1]-np.sqrt(R**2-(x-p[0])**2)
+    return x,ymas,ymenos
+
+
 #funciones phi
 def phi(vec_pos):
     f = fun(vec_pos[-1])
